@@ -66,7 +66,7 @@
       <b>☝️☝️ Both index fingers up</b> — petals drift down<br>
       <b>🖐 One hand open beside your face</b> — black-and-white film<br>
       <b>✋ Hand right up to the camera</b> — lights out<br>
-      <b>🙌 Both hands up beside your head</b> — you turn to light and vanish<br>
+      <b>🙈 Cover your face with both hands</b> — you turn to light and vanish<br>
       <b>😌 Close your eyes</b> — everything drifts into a soft dream<br>
       <b>Music sync</b> — everything pulses with the beat
     </div>
@@ -81,6 +81,7 @@ const WASM = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
 const HAND_MODEL = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
 const FACE_MODEL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
 const SEG_MODEL = "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter_landscape/float16/latest/selfie_segmenter_landscape.tflite";
+const SEG_MODEL_SQ = "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite";
 const POSE_MODEL = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
 
 const $ = id => document.getElementById(id);
@@ -162,7 +163,7 @@ function initGL() {
         }
         vec2 uv = (p + off) / res;
         vec4 col = texture2D(tex, vec2(uv.x, flip > 0.5 ? 1.0 - uv.y : uv.y));   // which way up depends on the browser / GPU, so it is measured once at start
-        col.rgb += hi * 0.6 - sh * 0.18;
+        col.rgb += hi * 0.85 - sh * 0.22;
         gl_FragColor = vec4(col.rgb, 1.0);
       }`;
     const mk = (t, s) => { const o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o); if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) throw gl.getShaderInfoLog(o); return o; };
@@ -590,7 +591,7 @@ const vanish = { t0: -1e9, parts: [] };
 /* One effect at a time: a gesture has to be held steady for a moment before it counts,
    and a new effect can only take over once you have let go of the current one (it fades out first). */
 const NEED = { drop: 0.15, pull: 0.25, dark: 0.5, vanish: 0.5, fog: 0, dream: 0.3 };              // seconds to hold (default 0.45)
-const LINGER = { drop: 900, pull: 250, sky: 1600, wire: 1600, glow: 1300, visor: 1300, petals: 1600, film: 700, dark: 400, fog: 9000, vanish: 5200, dream: 1300 };
+const LINGER = { drop: 900, pull: 250, sky: 1600, wire: 1600, glow: 1300, visor: 1300, petals: 1600, film: 700, dark: 400, fog: 9000, vanish: 4600, dream: 1300 };
 const LABEL = { drop: 'Water drop', pull: 'Pull it wider — let go to pin it', sky: 'The doves follow your hands', wire: 'Lift your hands — raise the mountains', glow: 'Glow', visor: 'Visor', petals: 'Petals', film: 'Film', dark: 'Lights out', fog: 'Wipe the mist with your hand', vanish: 'Vanishing…', dream: 'Dreaming' };
 let active = null, cand = { k: null, t: 0 }, breathT = 0;
 function currentGesture(now, dt) {
@@ -598,13 +599,15 @@ function currentGesture(now, dt) {
   const ups = hands.filter(h => h.up), flats = hands.filter(h => h.flat), fists = hands.filter(h => h.fist), pts = hands.filter(h => h.point), pin = hands.filter(h => h.pinch);
   const headY = fc ? fc.chin.y : H * 0.45;
   breathT = mouthOpenAmt > 1 ? breathT + dt : 0;
-  if (ups.length === 2 && ups.every(h => h.p[0].y < headY + (fc ? fc.h * 0.2 : 0)) && dist(ups[0].c, ups[1].c) > fw * 1.8) return 'vanish';
+  // 🙈 both hands in front of your face (the face itself may be hidden, so its last known place is used)
+  if (fc && hands.length === 2 && hands.every(h => dist(h.c, fc.c) < fw * 1.05 && !h.point && !h.fist)) return 'vanish';
   if (hands.some(h => h.open && h.size > Math.min(W, H) * 0.42 && (!fc || h.size > fw * 2.2))) return 'dark';
   if (pin.length === 2) return 'pull';
   if (pts.length === 2) return 'petals';
   if (pts.length === 1) return 'drop';
+  void headY;
   if (flats.length) return 'wire';
-  if (ups.length === 2) return 'sky';
+  if (hands.filter(h => h.open && !h.flat).length === 2) return 'sky';                    // two open palms (no need to be perfectly upright)
   const chinFists = fists.filter(h => fc && dist(h.c, fc.chin) < fw * 2.1);
   if (chinFists.length === 2) return 'visor';
   if (fists.length === 2) return 'glow';
@@ -646,7 +649,7 @@ function updateGestures(hands, now, dt) {
 }
 
 /* ---------- MediaPipe ---------- */
-let fileset, handLM, faceLM, segmenter = null, poseLM = null;
+let fileset, handLM, faceLM, segmenter = null, poseLM = null, cutKind = 'basic';
 let hands = [], faceBox = null, frameN = 0, lastVT = -1;
 const segIn = document.createElement('canvas'), sgx = segIn.getContext('2d', { willReadFrequently: true });
 const maskC = document.createElement('canvas'), mcx = maskC.getContext('2d');
@@ -664,9 +667,11 @@ async function loadModels() {
   try { handLM = await HandLandmarker.createFromOptions(fileset, hOpts('GPU')); } catch (e) { handLM = await HandLandmarker.createFromOptions(fileset, hOpts('CPU')); }
   faceLM = await FaceLandmarker.createFromOptions(fileset, { baseOptions: { modelAssetPath: FACE_MODEL, delegate: 'CPU' }, runningMode: 'VIDEO', numFaces: 1, outputFaceBlendshapes: true });
   // a selfie segmenter gives much cleaner edges than the pose mask; fall back to the pose mask if it can't load
-  const sOpts = d => ({ baseOptions: { modelAssetPath: SEG_MODEL, delegate: d }, runningMode: 'VIDEO', outputConfidenceMasks: true, outputCategoryMask: false });
-  try { segmenter = await ImageSegmenter.createFromOptions(fileset, sOpts('GPU')); }
-  catch (e) { try { segmenter = await ImageSegmenter.createFromOptions(fileset, sOpts('CPU')); } catch (e2) { segmenter = null; } }
+  const sOpts = (m, d) => ({ baseOptions: { modelAssetPath: m, delegate: d }, runningMode: 'VIDEO', outputConfidenceMasks: true, outputCategoryMask: false });
+  for (const [m, d] of [[SEG_MODEL, 'GPU'], [SEG_MODEL, 'CPU'], [SEG_MODEL_SQ, 'GPU'], [SEG_MODEL_SQ, 'CPU']]) {
+    if (segmenter) break;
+    try { segmenter = await ImageSegmenter.createFromOptions(fileset, sOpts(m, d)); cutKind = 'HQ'; } catch (e) { console.warn('segmenter', m, d, e); segmenter = null; }
+  }
   if (!segmenter) { try { poseLM = await PoseLandmarker.createFromOptions(fileset, { baseOptions: { modelAssetPath: POSE_MODEL, delegate: 'CPU' }, runningMode: 'VIDEO', numPoses: 1, outputSegmentationMasks: true }); } catch (e) { poseLM = null; } }
 }
 function maskFrom(arr, mw, mh) {
@@ -769,16 +774,16 @@ function startVanish(now) {
   }
 }
 function drawVanish(now) {
-  const va = (now - vanish.t0) / 1000; if (va < 0 || va > 5.2 || !haveMask) return;
-  const room = smooth(0.9, 1.6, va) * (1 - smooth(4.0, 5.0, va));
+  const va = (now - vanish.t0) / 1000; if (va < 0 || va > 4.6 || !haveMask) return;
+  const room = smooth(0.8, 1.5, va) * (1 - smooth(3.4, 4.4, va));
   const sil = smooth(0, 0.45, va) * (1 - smooth(1.0, 1.8, va));
-  if (room > 0) { ctx.save(); ctx.globalAlpha = room; drawMirrored(fillC, 'saturate(1.04) brightness(1.04) contrast(1.02) blur(1.5px)'); ctx.restore();
+  if (room > 0) { ctx.save(); ctx.globalAlpha = room; drawMirrored(fillC, 'saturate(0.95) brightness(1.1) blur(7px)'); ctx.fillStyle = 'rgba(240,245,252,0.22)'; ctx.fillRect(0, 0, W, H); ctx.restore();
     ctx.save(); ctx.globalCompositeOperation = 'soft-light'; ctx.globalAlpha = 0.22 * room; ctx.fillStyle = '#bcd3f0'; ctx.fillRect(0, 0, W, H); ctx.restore(); }
   if (sil > 0) {
     ctx.save(); ctx.globalAlpha = sil * 0.35; ctx.fillStyle = '#6f8fbf'; ctx.globalCompositeOperation = 'multiply'; ctx.fillRect(0, 0, W, H); ctx.restore();
     ctx.save(); ctx.globalAlpha = sil * 0.94; ctx.shadowColor = 'rgba(255,255,255,0.95)'; ctx.shadowBlur = 30; drawMirrored(silhouette(), 'blur(2.5px)'); ctx.restore();
   }
-  if (va > 1.0 && va < 4.2) {
+  if (va > 0.9 && va < 3.8) {
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
     for (const p of vanish.parts) {
       const k = va - 1.0 - p.delay; if (k < 0) continue;
@@ -797,7 +802,7 @@ function frame() {
   requestAnimationFrame(frame);
   const now = performance.now(), dt = Math.min(0.1, (now - lastT) / 1000), t = now / 1000; lastT = now;
   detect(now); updateBeat(now); updateGestures(hands, now, dt);
-  if (!hands.length && dreamAmt < 0.3 && now - statusAt > 2600) say(haveMask ? 'Point · breathe · pinch · palms · fists · hands up' : 'Looking for you…');
+  if (!hands.length && dreamAmt < 0.3 && now - statusAt > 2600) say(haveMask ? 'Point · breathe · pinch · palms · fists · cover your face' : 'Looking for you…');
   const palms = hands.filter(h => h.open).map(h => ({ x: h.c.x, y: h.c.y - h.size * 0.4, r: h.size * 1.5 }));
   updateBirds(dt, scene.sky > 0.2 ? palms : []);
   $('beatDot').style.transform = `scale(${1 + beat * 1.2})`; $('beatDot').style.background = analyser ? `rgba(170,205,255,${0.5 + beat * 0.5})` : 'rgba(255,255,255,.35)';
@@ -852,7 +857,7 @@ $('startBtn').onclick = async () => {
     if (!running) { running = true; requestAnimationFrame(frame); }
     setTimeout(() => { skyTex = skyTex || makeSky(); }, 50);
     await loadModels();
-    say('Point · breathe · pinch · palms · fists · hands up');
+    say('Ready · cut-out: ' + cutKind);
   } catch (e) {
     console.error(e); $('start').style.display = 'flex'; btn.disabled = false; btn.textContent = 'Try again';
     $('err').textContent = 'Could not open the camera or load the models. Please allow camera access, check your internet connection, and use Chrome or Safari. (' + (e.message || e) + ')';
