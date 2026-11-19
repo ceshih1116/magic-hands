@@ -481,20 +481,20 @@ function cardSlot(i) {               // places around your head: right, left, up
   const side = i % 2 ? -1 : 1, row = Math.floor(i / 2) % 3;
   return { x: fc.x + side * (fw * 1.55 + row * fw * 0.25), y: fc.y - fw * 0.25 + (row - 1) * fw * 0.85 };
 }
-function updateCards(now, dt) {
+function updateCards(now, dt, allowed) {
   const pin = hands.filter(h => h.pinch);
-  if (pin.length === 2) {
+  if (allowed && pin.length === 2) {
     const [a, b] = pin.sort((u, v) => u.pp.x - v.pp.x);
     if (!pull) { pull = { kind: MINI[cardN % MINI.length], born: now, a: { ...a.pp }, b: { ...b.pp } }; glint(a.pp.x, a.pp.y, 6, 8); glint(b.pp.x, b.pp.y, 6, 8); }
     pull.a = { x: lerp(pull.a.x, a.pp.x, ease(dt, 20)), y: lerp(pull.a.y, a.pp.y, ease(dt, 20)) }; pull.b = { x: lerp(pull.b.x, b.pp.x, ease(dt, 20)), y: lerp(pull.b.y, b.pp.y, ease(dt, 20)) };
-    pull.seen = now; say('Pull it wider — let go to pin it in the air');
+    pull.seen = now;
   } else if (pull && now - pull.seen > 180) {
     const len = dist(pull.a, pull.b);
     if (len > Math.min(W, H) * 0.12 && now - pull.born > 350) {
       const slot = cardSlot(cards.length), w = Math.min(W, H) * 0.2;
       cards.push({ kind: pull.kind, x: (pull.a.x + pull.b.x) / 2, y: (pull.a.y + pull.b.y) / 2, w: len, ang: Math.atan2(pull.b.y - pull.a.y, pull.b.x - pull.a.x), tx: slot.x, ty: slot.y, tw: w, born: now, ph: rand(0, 6) });
       if (cards.length > 6) cards.shift();
-      cardN++; say('Pinned');
+      cardN++;
     }
     pull = null;
   }
@@ -520,10 +520,10 @@ function drawCard(kind, cx, cy, w, ang, alpha, t, stretching) {
 }
 function drawCards(now, t) {
   for (const c of cards) {
-    const age = (now - c.born) / 1000, a = clamp(age * 4, 0, 1) * (age > 40 ? clamp(1 - (age - 40) / 2, 0, 1) : 1);
+    const age = (now - c.born) / 1000, a = clamp(age * 4, 0, 1) * (age > 18 ? clamp(1 - (age - 18) / 2, 0, 1) : 1);
     drawCard(c.kind, c.x, c.y + Math.sin(t * 1.2 + c.ph) * 4, c.w, c.ang + Math.sin(t * 0.8 + c.ph) * 0.03, a, t, false);
   }
-  for (let i = cards.length - 1; i >= 0; i--) if ((now - cards[i].born) / 1000 > 42) cards.splice(i, 1);
+  for (let i = cards.length - 1; i >= 0; i--) if ((now - cards[i].born) / 1000 > 20) cards.splice(i, 1);
   if (pull) {
     const len = dist(pull.a, pull.b), ang = Math.atan2(pull.b.y - pull.a.y, pull.b.x - pull.a.x);
     drawCard(pull.kind, (pull.a.x + pull.b.x) / 2, (pull.a.y + pull.b.y) / 2, Math.max(20, len), ang, clamp((now - pull.born) / 250, 0, 1), t, true);
@@ -552,8 +552,7 @@ function drawVisor(t) {
 /* ---------- 🌸 Petals: both index fingers up ---------- */
 const petals = [];
 let petalUntil = 0;
-function updatePetals(now, dt) {
-  const on = now < petalUntil;
+function updatePetals(now, dt, on) {
   if (on && petals.length < 90 && Math.random() < 0.6) petals.push({ x: rand(-0.05, 1.05) * W, y: -20, vx: rand(-0.4, 0.6), vy: rand(0.6, 1.5), r: rand(5, 10), rot: rand(0, 6), vr: rand(-0.04, 0.04), ph: rand(0, 6), col: pick(['255,196,214', '255,214,226', '252,180,204', '255,232,238']) });
   for (const p of petals) { p.ph += 0.03; p.x += (p.vx + Math.sin(p.ph) * 0.6) * dt * 60; p.y += p.vy * dt * 60; p.rot += p.vr * dt * 60; }
   for (let i = petals.length - 1; i >= 0; i--) if (petals[i].y > H + 30) petals.splice(i, 1);
@@ -588,54 +587,62 @@ function drawDark() {
 const scene = { sky: 0, wire: 0, aura: 0 }, sceneUntil = { sky: 0, wire: 0, aura: 0 };
 let lastTip = null, lastDropAt = 0, holdFlat = 0, holdUp = 0, holdFist = 0, holdVanish = 0;
 const vanish = { t0: -1e9, parts: [] };
-let holdVisor = 0, holdDark = 0;
-function updateGestures(hands, now, dt) {
-  const vanishing = now - vanish.t0 < 5200;
+/* One effect at a time: a gesture has to be held steady for a moment before it counts,
+   and a new effect can only take over once you have let go of the current one (it fades out first). */
+const NEED = { drop: 0.15, pull: 0.25, dark: 0.5, vanish: 0.5, fog: 0, dream: 0.3 };              // seconds to hold (default 0.45)
+const LINGER = { drop: 900, pull: 250, sky: 1600, wire: 1600, glow: 1300, visor: 1300, petals: 1600, film: 700, dark: 400, fog: 9000, vanish: 5200, dream: 1300 };
+const LABEL = { drop: 'Water drop', pull: 'Pull it wider — let go to pin it', sky: 'The doves follow your hands', wire: 'Lift your hands — raise the mountains', glow: 'Glow', visor: 'Visor', petals: 'Petals', film: 'Film', dark: 'Lights out', fog: 'Wipe the mist with your hand', vanish: 'Vanishing…', dream: 'Dreaming' };
+let active = null, cand = { k: null, t: 0 }, breathT = 0;
+function currentGesture(now, dt) {
   const fc = faceBox, fw = fc ? fc.w : W * 0.15;
-  // ☝️☝️ both index fingers up → petals;  ☝️ one finger → a water drop
-  const pts = hands.filter(h => h.point);
-  if (pts.length === 2) { petalUntil = now + 2500; say('Petals'); lastTip = null; }
-  else if (pts.length === 1) {
-    const pt = pts[0], tip = pt.p[8];
-    if (!lastTip || now - lastDropAt > 1100 || dist(tip, lastTip) > pt.size * 1.1) { addRipple(tip.x, tip.y, 1); lastDropAt = now; lastTip = { x: tip.x, y: tip.y }; say('Water drop'); }
-  } else lastTip = null;
-  const ups = hands.filter(h => h.up), flats = hands.filter(h => h.flat), fists = hands.filter(h => h.fist);
-  // 🙌 both palms up beside your head (wrists above the chin) → vanish
+  const ups = hands.filter(h => h.up), flats = hands.filter(h => h.flat), fists = hands.filter(h => h.fist), pts = hands.filter(h => h.point), pin = hands.filter(h => h.pinch);
   const headY = fc ? fc.chin.y : H * 0.45;
-  const handsHigh = ups.length === 2 && ups.every(h => h.p[0].y < headY + (fc ? fc.h * 0.2 : 0)) && dist(ups[0].c, ups[1].c) > fw * 1.8;
-  holdVanish = handsHigh ? holdVanish + dt : 0;
-  if (holdVanish > 0.5 && !vanishing && now - vanish.t0 > 6500 && haveMask) startVanish(now);
-  // 🤲 flat hands → wireframe mountains
-  holdFlat = flats.length ? holdFlat + dt : 0;
-  if (holdFlat > 0.25) {
-    sceneUntil.wire = now + 2500; say('Lift your hands — raise the mountains');
-    wireBumps = flats.map(h => { const z = 3.2; return { x: (h.c.x - W / 2) / (Math.min(W, H) * 0.9) * z, z, h: clamp((H * 0.95 - h.c.y) / H, 0, 1) * 2.4 }; });
-  }
-  // 🖐🖐 two open palms raised (lower than the vanish pose) → sky and doves
-  holdUp = ups.length === 2 && !handsHigh ? holdUp + dt : 0;
-  if (holdUp > 0.2 && !vanishing) { sceneUntil.sky = now + 3500; say('The doves follow your hands'); }
-  // 🖐 one open hand right beside your face → black-and-white film
-  const byFace = hands.filter(h => h.open && fc && dist(h.c, fc.c) < fw * 1.7);
-  if (byFace.length === 1 && ups.length < 2) { bwUntil = now + 1400; say('Film'); }
-  // ✋ a hand right up to the camera → lights out
-  // (only when the hand nearly covers the camera, held for half a second — raising your hands normally never does this)
-  const covering = hands.some(h => h.open && h.size > Math.min(W, H) * 0.42 && (!fc || h.size > fw * 2.2));
-  holdDark = covering ? holdDark + dt : 0;
-  if (holdDark > 0.5) { darkUntil = now + 700; say('Lights out'); }
-  // ✊✊ fists by your chin → visor (and petals);  fists further out → glow
+  breathT = mouthOpenAmt > 1 ? breathT + dt : 0;
+  if (ups.length === 2 && ups.every(h => h.p[0].y < headY + (fc ? fc.h * 0.2 : 0)) && dist(ups[0].c, ups[1].c) > fw * 1.8) return 'vanish';
+  if (hands.some(h => h.open && h.size > Math.min(W, H) * 0.42 && (!fc || h.size > fw * 2.2))) return 'dark';
+  if (pin.length === 2) return 'pull';
+  if (pts.length === 2) return 'petals';
+  if (pts.length === 1) return 'drop';
+  if (flats.length) return 'wire';
+  if (ups.length === 2) return 'sky';
   const chinFists = fists.filter(h => fc && dist(h.c, fc.chin) < fw * 2.1);
-  holdVisor = chinFists.length === 2 ? holdVisor + dt : 0;
-  if (holdVisor > 0.3) { visorUntil = now + 4500; petalUntil = Math.max(petalUntil, now + 2000); say('Visor'); }
-  holdFist = fists.length === 2 && chinFists.length < 2 ? holdFist + dt : 0;
-  if (holdFist > 0.3) { sceneUntil.aura = now + 2500; say('Glow'); }
-  // 😮 breathe out on the glass ("haa" / "hoo", held a moment) → fog you can wipe with your hand
-  if (mouthOpenAmt > 1) { if (!mouthSince) mouthSince = now; if (now - mouthSince > 450) { startFog(now); say('Wipe the mist with your hand'); } } else mouthSince = 0;
-  updateFog(now, dt); updateCards(now, dt); updatePetals(now, dt);
-  bwAmt = lerp(bwAmt, now < bwUntil ? 1 : 0, ease(dt, now < bwUntil ? 5 : 3));
-  visorAmt = lerp(visorAmt, now < visorUntil ? 1 : 0, ease(dt, now < visorUntil ? 6 : 3));
-  darkAmt = lerp(darkAmt, now < darkUntil ? 1 : 0, ease(dt, now < darkUntil ? 6 : 2.5));
-  const order = Object.keys(scene).sort((a, b) => sceneUntil[b] - sceneUntil[a]);
-  for (const k of Object.keys(scene)) { const on = !vanishing && now < sceneUntil[k] && k === order[0]; scene[k] = lerp(scene[k], on ? 1 : 0, ease(dt, on ? 3 : 1.6)); }
+  if (chinFists.length === 2) return 'visor';
+  if (fists.length === 2) return 'glow';
+  if (hands.filter(h => h.open && fc && dist(h.c, fc.c) < fw * 1.7).length === 1) return 'film';
+  if (breathT > 0.45) return 'fog';
+  if (eyesClosed && now - eyesClosedSince > 250) return 'dream';
+  return null;
+}
+function activate(k, now) {
+  if (active && active.k === 'fog' && k !== 'fog') fogUntil = now;              // the mist clears when something else starts
+  active = { k, since: now, seen: now };
+  if (k === 'vanish') startVanish(now);
+  if (k === 'fog') startFog(now);
+  say(LABEL[k]);
+}
+function updateGestures(hands, now, dt) {
+  const g = window.__forceG !== undefined ? window.__forceG : currentGesture(now, dt);
+  cand = g === cand.k ? { k: g, t: cand.t + dt } : { k: g, t: 0 };
+  if (active && g === active.k) active.seen = now;
+  const released = active ? now - active.seen : 1e9;
+  if (active && released > LINGER[active.k]) active = null;
+  const canSwitch = !active || (released > 350 && active.k !== 'vanish' && (active.k !== 'fog' || released > 5000));
+  if (g && cand.t >= (NEED[g] ?? 0.45) && (!active || g !== active.k) && canSwitch) activate(g, now);
+  const A = active ? active.k : null, holding = A && g === A;
+  if (A) say(LABEL[A]);
+  // per-effect work while it is the active one
+  if (A === 'drop' && holding) {
+    const pt = hands.find(h => h.point), tip = pt.p[8];
+    if (!lastTip || now - lastDropAt > 1100 || dist(tip, lastTip) > pt.size * 1.1) { addRipple(tip.x, tip.y, 1); lastDropAt = now; lastTip = { x: tip.x, y: tip.y }; }
+  } else lastTip = null;
+  if (A === 'wire' && holding) wireBumps = hands.filter(h => h.flat).map(h => { const z = 3.2; return { x: (h.c.x - W / 2) / (Math.min(W, H) * 0.9) * z, z, h: clamp((H * 0.95 - h.c.y) / H, 0, 1) * 2.4 }; });
+  if (A === 'fog' && holding) fogUntil = Math.max(fogUntil, now + 9000);
+  updateFog(now, dt); updateCards(now, dt, A === 'pull'); updatePetals(now, dt, A === 'petals');
+  const to = (v, on, up, down) => lerp(v, on ? 1 : 0, ease(dt, on ? up : down));
+  bwAmt = to(bwAmt, A === 'film', 5, 3); visorAmt = to(visorAmt, A === 'visor', 6, 3); darkAmt = to(darkAmt, A === 'dark', 6, 2.5);
+  dreamAmt = to(dreamAmt, A === 'dream' || window.__forceDream, 2.5, 1.5);
+  const want = { sky: A === 'sky', wire: A === 'wire', aura: A === 'glow' };
+  for (const k of Object.keys(scene)) scene[k] = to(scene[k], want[k], 3, 1.8);
 }
 
 /* ---------- MediaPipe ---------- */
@@ -760,7 +767,6 @@ function startVanish(now) {
     const sx = W - (c.ox + x / mw * c.dw), sy = c.oy + y / mh * c.dh;
     vanish.parts.push({ x: sx, y: sy, vx: rand(-0.6, 0.6), vy: rand(-1.6, -0.2), r: rand(0.8, 2.4), delay: rand(0, 0.6) + (1 - y / mh) * 0.5 });
   }
-  say('Vanishing…');
 }
 function drawVanish(now) {
   const va = (now - vanish.t0) / 1000; if (va < 0 || va > 5.2 || !haveMask) return;
@@ -791,9 +797,6 @@ function frame() {
   requestAnimationFrame(frame);
   const now = performance.now(), dt = Math.min(0.1, (now - lastT) / 1000), t = now / 1000; lastT = now;
   detect(now); updateBeat(now); updateGestures(hands, now, dt);
-  const wantDream = window.__forceDream || (eyesClosed ? now - eyesClosedSince > 250 : (now - eyesOpenSince < 1200 && dreamAmt > 0.3));
-  dreamAmt = lerp(dreamAmt, wantDream ? 1 : 0, ease(dt, wantDream ? 2.5 : 1.5));
-  if (dreamAmt > 0.4) say('Dreaming');
   if (!hands.length && dreamAmt < 0.3 && now - statusAt > 2600) say(haveMask ? 'Point · breathe · pinch · palms · fists · hands up' : 'Looking for you…');
   const palms = hands.filter(h => h.open).map(h => ({ x: h.c.x, y: h.c.y - h.size * 0.4, r: h.size * 1.5 }));
   updateBirds(dt, scene.sky > 0.2 ? palms : []);
@@ -858,13 +861,13 @@ $('startBtn').onclick = async () => {
 
 // for automated tests
 window.__ds = () => ({ hands: hands.length, flags: hands.map(h => (h.point ? 'P' : '') + (h.up ? 'U' : '') + (h.flat ? 'F' : '') + (h.fist ? 'X' : '') + (h.open ? 'O' : '')).join(','), sky: +scene.sky.toFixed(2), wire: +scene.wire.toFixed(2), aura: +scene.aura.toFixed(2), vanish: performance.now() - vanish.t0 < 5200, ripples: ripples.length, mask: haveMask, mouth: lastMouth, fog: +fogAmt.toFixed(2), dreamA: +dreamAmt.toFixed(2), blink: +lastBlink.toFixed(2), squint: +lastSquint.toFixed(2), lookDown: +lastLook.toFixed(2), seg: !!segmenter, gl: !!gl, flip: flipY, dream: +dreamAmt.toFixed(2), status: statusMsg });
-window.__scene = k => { for (const q in sceneUntil) sceneUntil[q] = 0; if (k) sceneUntil[k] = performance.now() + 60000; };
-window.__vanish = () => startVanish(performance.now());
+window.__scene = k => window.__fx(k === 'aura' ? 'glow' : k);
+window.__vanish = () => { window.__forceG = 'vanish'; setTimeout(() => { delete window.__forceG; }, 800); };
 window.__drop = (x, y) => addRipple(x * W, y * H, 1);
-window.__fog = () => startFog(performance.now());
+window.__fog = () => window.__fx('fog');
 window.__cards = (n) => { for (let i = 0; i < n; i++) { const sl = cardSlot(cards.length); cards.push({ kind: MINI[cardN++ % MINI.length], x: sl.x, y: sl.y, w: Math.min(W, H) * 0.2, ang: 0, tx: sl.x, ty: sl.y, tw: Math.min(W, H) * 0.2, born: performance.now() - 1000, ph: Math.random() * 6 }); } };
 window.__pull = (on) => { pull = on ? { kind: MINI[cardN % MINI.length], born: performance.now() - 500, a: { x: W * 0.32, y: H * 0.62 }, b: { x: W * 0.62, y: H * 0.55 }, seen: performance.now() + 60000 } : null; };
-window.__fx = (k, ms) => { const u = performance.now() + (ms || 60000); if (k === 'bw') bwUntil = u; if (k === 'visor') visorUntil = u; if (k === 'petals') petalUntil = u; if (k === 'dark') darkUntil = u; };
+window.__fx = (k) => { window.__forceG = k || undefined; if (!k) { active = null; delete window.__forceG; } };
 </script>
 </body>
 </html>
