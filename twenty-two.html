@@ -67,7 +67,7 @@
     <h1>Twenty-Two <small>an AR birthday</small></h1>
     <div class="how">
       🫧 <b>Open your palm</b> — a photo bubble pops out of each fingertip<br>
-      ☝️ <b>Point one finger</b> — soap bubbles float up; poke them to pop<br>
+      ☝️ <b>Point one finger</b> — bubbles float up (photos, stickers, words, glitter, hearts); poke them to pop<br>
       🖼 <b>Make a frame</b> with both thumbs &amp; index fingers — a photo appears inside<br>
       ✌️✌️ <b>Two peace signs</b> — "2" + "2" balloons and a birthday cake<br>
       😌 <b>Close your eyes</b> — make a wish<br>
@@ -170,6 +170,8 @@ function stepParts(dt) {
   for (const p of parts) {
     p.life -= p.d * f;
     if (p.k === 'c') { p.vy += 0.18 * f; p.vx *= 0.99; p.x += p.vx * f; p.y += p.vy * f; p.rot += p.vr * f; }
+    else if (p.k === 't') { p.y += p.vy * f; }
+    else if (p.k === 'h') { p.vy += 0.08 * f; p.x += p.vx * f; p.y += p.vy * f; }
     else if (p.k === 'm') { p.ph += 0.05 * f; p.x += (p.vx + Math.sin(p.ph) * 0.4) * f; p.y += p.vy * f; p.r += 0.15 * f; }
     else { p.x += p.vx * f; p.y += p.vy * f; }
   }
@@ -179,6 +181,8 @@ function drawParts() {
   for (const p of parts) {
     ctx.save(); ctx.globalAlpha = clamp(p.life * 1.5, 0, 1);
     if (p.k === 'c') { ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.fillStyle = p.col; ctx.fillRect(-p.r / 2, -p.r / 4, p.r, p.r / 2); }
+    else if (p.k === 't') { ctx.font = `800 ${p.size}px "Baloo 2", sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineWidth = p.size * 0.16; ctx.strokeStyle = '#ff7eb6'; ctx.strokeText(p.text, p.x, p.y); ctx.fillStyle = '#fff'; ctx.fillText(p.text, p.x, p.y); }
+    else if (p.k === 'h') { const s2 = p.r; ctx.translate(p.x, p.y); ctx.fillStyle = '#ff6fae'; ctx.beginPath(); ctx.moveTo(0, s2 * .35); ctx.bezierCurveTo(-s2 * 1.1, -s2 * .35, -s2 * .55, -s2 * 1.1, 0, -s2 * .5); ctx.bezierCurveTo(s2 * .55, -s2 * 1.1, s2 * 1.1, -s2 * .35, 0, s2 * .35); ctx.fill(); }
     else if (p.k === 'm') { ctx.globalAlpha *= 0.35; ctx.fillStyle = '#f3f3f6'; ctx.filter = 'blur(3px)'; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill(); }
     else { ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = p.col; ctx.shadowColor = p.col; ctx.shadowBlur = 8; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill(); }
     ctx.restore();
@@ -250,6 +254,25 @@ function drawBubbles(now) {
 /* ---------- ☝️ Poke bubbles: point to blow bubbles, poke them to pop ---------- */
 const floaters = [];
 let floatCount = 0;
+const EMOJIS = ['🎂', '🍰', '🎈', '🍓', '💖', '⭐', '🧁', '🎀', '🌷', '🍒'];
+function wordList() { return ['22', 'happy', $('wish1').value, $('wish2').value, '♡', 'love you'].filter(Boolean); }
+// mix of bubble types: photo / sticker / word / glitter / heart / plain
+function pickType() {
+  const r = Math.random(), hasPhotos = photos.length > 0;
+  if (r < (hasPhotos ? 0.2 : 0)) return 'photo';
+  if (r < 0.38) return 'emoji';
+  if (r < 0.53) return 'word';
+  if (r < 0.68) return 'glitter';
+  if (r < 0.8) return 'heart';
+  return 'plain';
+}
+function popEffect(b) {
+  if (b.type === 'emoji') confetti(b.x, b.y, 18, 0.6);
+  else if (b.type === 'word') parts.push({ k: 't', x: b.x, y: b.y, vx: 0, vy: -0.9, life: 1, d: 0.012, text: b.word, size: b.R * 0.75 });
+  else if (b.type === 'glitter') sparkle(b.x, b.y, 30, b.R * 1.2);
+  else if (b.type === 'heart') for (let i = 0; i < 8; i++) parts.push({ k: 'h', x: b.x, y: b.y, vx: rand(-2.5, 2.5), vy: rand(-3, -0.5), r: rand(5, 9), life: 1, d: rand(0.015, 0.025) });
+  else sparkle(b.x, b.y, 14, b.R * 0.8);
+}
 const lastTip = {};
 function updateFloaters(hands, now, dt) {
   const framing = frameAmt > 0.3 || hands.filter(h => h.ell).length === 2;
@@ -258,9 +281,11 @@ function updateFloaters(hands, now, dt) {
     const prev = lastTip[tp.key], moved = prev ? Math.hypot(tp.x - prev.x, tp.y - prev.y) : 0;
     if (!prev || now - prev.t > 260 || moved > tp.size * 0.5) {         // a new bubble every ~0.26 s, or sooner when the finger moves
       floatCount++;
-      const photo = floatCount % 4 === 0 && photos.length > 0;
-      floaters.push({ x: tp.x, y: tp.y - tp.size * 0.15, vx: rand(-0.6, 0.6), vy: rand(-1.6, -0.8), R: tp.size * (photo ? rand(0.32, 0.4) : rand(0.12, 0.24)),
-        born: now, ph: rand(0, 6.28), photo: photo ? (floatCount / 4) % photos.length | 0 : -1, popping: 0 });
+      const type = pickType();
+      const big = type === 'photo' || type === 'word' || type === 'emoji' || type === 'heart';
+      floaters.push({ x: tp.x, y: tp.y - tp.size * 0.15, vx: rand(-0.6, 0.6), vy: rand(-1.6, -0.8), R: tp.size * (big ? rand(0.3, 0.38) : rand(0.13, 0.24)),
+        born: now, ph: rand(0, 6.28), type, photo: type === 'photo' ? floatCount % photos.length : -1,
+        emoji: pick(EMOJIS), word: pick(wordList()), hue: rand(0, 360), dots: Array.from({ length: 14 }, () => [rand(-0.7, 0.7), rand(-0.7, 0.7), rand(0, 6)]), popping: 0 });
       lastTip[tp.key] = { x: tp.x, y: tp.y, t: now };
     }
   }
@@ -271,7 +296,7 @@ function updateFloaters(hands, now, dt) {
     b.ph += 0.04 * f; b.x += (b.vx + Math.sin(b.ph) * 0.5) * f; b.y += (b.vy - beat * 0.6) * f; b.vy *= 0.995;
     const age = (now - b.born) / 1000;
     // poke: any pointing fingertip touching a bubble (not the one it just came out of) pops it
-    if (age > 0.6) for (const tp of tips) if (Math.hypot(tp.x - b.x, tp.y - b.y) < b.R * 0.95) { b.popping = 0.01; sparkle(b.x, b.y, 14, b.R * 0.8); break; }
+    if (age > 0.6) for (const tp of tips) if (Math.hypot(tp.x - b.x, tp.y - b.y) < b.R * 0.95) { b.popping = 0.01; popEffect(b); break; }
     if (age > 9 && !b.popping) b.popping = 0.01;
   }
   for (let i = floaters.length - 1; i >= 0; i--) { const b = floaters[i]; if (b.popping > 1 || b.y < -b.R * 2) floaters.splice(i, 1); }
@@ -284,17 +309,33 @@ function drawFloaters() {
       const k = b.popping; ctx.globalAlpha = Math.max(0, 1 - k); ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(b.x, b.y, b.R * (1 + k * 0.8), 0, Math.PI * 2); ctx.stroke(); ctx.restore(); continue;
     }
-    const age = (performance.now() - b.born) / 1000, R = b.R * Math.min(1, age * 4) * (1 + beat * 0.06);
-    if (b.photo >= 0) {
-      ctx.beginPath(); ctx.arc(b.x, b.y, R, 0, Math.PI * 2); ctx.save(); ctx.clip(); ctx.globalAlpha = 0.92;
-      drawCover(photos[b.photo % photos.length], b.x - R, b.y - R, R * 2, R * 2); ctx.restore();
-    }
+    const now2 = performance.now(), age = (now2 - b.born) / 1000, R = b.R * Math.min(1, age * 4) * (1 + beat * 0.06);
+    const hue = (b.hue + now2 / 20 + beat * 60) % 360;
+    const path = () => {
+      ctx.beginPath();
+      if (b.type === 'heart') { const s2 = R * 1.05; ctx.moveTo(b.x, b.y + s2 * 0.75); ctx.bezierCurveTo(b.x - s2 * 1.5, b.y - s2 * 0.2, b.x - s2 * 0.6, b.y - s2 * 1.25, b.x, b.y - s2 * 0.45); ctx.bezierCurveTo(b.x + s2 * 0.6, b.y - s2 * 1.25, b.x + s2 * 1.5, b.y - s2 * 0.2, b.x, b.y + s2 * 0.75); ctx.closePath(); }
+      else ctx.arc(b.x, b.y, R, 0, Math.PI * 2);
+    };
+    // contents
+    if (b.type === 'photo' && photos.length) { path(); ctx.save(); ctx.clip(); ctx.globalAlpha = 0.92; drawCover(photos[b.photo % photos.length], b.x - R, b.y - R, R * 2, R * 2); ctx.restore(); }
+    if (b.type === 'heart') { path(); ctx.fillStyle = 'rgba(255,150,200,0.22)'; ctx.fill(); }
+    if (b.type === 'glitter') { path(); ctx.save(); ctx.clip(); ctx.globalCompositeOperation = 'lighter';
+      for (const [dx, dy, tw] of b.dots) { const a = 0.4 + 0.6 * Math.abs(Math.sin(now2 / 180 + tw)); ctx.fillStyle = `hsla(${(hue + tw * 40) % 360},100%,85%,${a})`; ctx.beginPath(); ctx.arc(b.x + dx * R, b.y + dy * R, R * 0.06 + a * R * 0.04, 0, Math.PI * 2); ctx.fill(); }
+      ctx.restore(); }
+    // soap film + rainbow rim
     const g = ctx.createRadialGradient(b.x - R * 0.3, b.y - R * 0.35, R * 0.1, b.x, b.y, R);
-    g.addColorStop(0, 'rgba(255,255,255,0.25)'); g.addColorStop(0.65, 'rgba(255,255,255,0.03)'); g.addColorStop(0.88, 'rgba(170,225,255,0.22)'); g.addColorStop(1, 'rgba(255,170,225,0.5)');
-    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(b.x, b.y, R, 0, Math.PI * 2); ctx.fill();
+    g.addColorStop(0, 'rgba(255,255,255,0.25)'); g.addColorStop(0.65, 'rgba(255,255,255,0.03)'); g.addColorStop(0.88, `hsla(${(hue + 180) % 360},90%,85%,0.25)`); g.addColorStop(1, `hsla(${hue},90%,80%,0.5)`);
+    path(); ctx.fillStyle = g; ctx.fill();
     const rim = ctx.createLinearGradient(b.x - R, b.y - R, b.x + R, b.y + R);
-    rim.addColorStop(0, 'rgba(255,180,225,0.9)'); rim.addColorStop(0.5, 'rgba(170,235,255,0.9)'); rim.addColorStop(1, 'rgba(255,240,180,0.9)');
-    ctx.strokeStyle = rim; ctx.lineWidth = Math.max(1.2, R * 0.05); ctx.beginPath(); ctx.arc(b.x, b.y, R, 0, Math.PI * 2); ctx.stroke();
+    rim.addColorStop(0, `hsla(${hue},95%,82%,0.95)`); rim.addColorStop(0.5, `hsla(${(hue + 120) % 360},95%,82%,0.95)`); rim.addColorStop(1, `hsla(${(hue + 240) % 360},95%,85%,0.95)`);
+    ctx.strokeStyle = rim; ctx.lineWidth = Math.max(1.2, R * 0.05); path(); ctx.stroke();
+    if (b.type === 'emoji') { ctx.font = `${R * 1.05}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(b.emoji, b.x, b.y + R * 0.06); }
+    if (b.type === 'word') {
+      let fs = R * 0.62; ctx.font = `800 ${fs}px "Baloo 2", sans-serif`;
+      const w = ctx.measureText(b.word).width; if (w > R * 1.6) { fs *= R * 1.6 / w; ctx.font = `800 ${fs}px "Baloo 2", sans-serif`; }
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineWidth = fs * 0.18; ctx.strokeStyle = `hsla(${hue},80%,60%,0.9)`; ctx.strokeText(b.word, b.x, b.y);
+      ctx.fillStyle = '#fff'; ctx.fillText(b.word, b.x, b.y);
+    }
     ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.beginPath(); ctx.ellipse(b.x - R * 0.42, b.y - R * 0.48, R * 0.15, R * 0.07, -0.7, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
   }
@@ -541,6 +582,8 @@ $('startBtn').onclick = async () => {
 // for automated tests
 window.__tt = () => ({ hands: hands.length, open: hands.filter(h => h.open).length, peace: hands.filter(h => h.peace).length, ell: hands.filter(h => h.ell).length,
   bubbles: Object.values(bubbles).filter(b => b.amt > 0.5).length, point: hands.filter(h => h.point).length, floaters: floaters.length, frame: +frameAmt.toFixed(2), cake: cake ? cake.state : null, wish: +wishAmt.toFixed(2), eyesClosed, mouth: +mouthOpen.toFixed(2), photos: photos.length });
+window.__spawnAll = () => { ['photo','emoji','word','glitter','heart','plain'].forEach((type, i) => floaters.push({ x: W * (0.15 + i * 0.14), y: H * 0.45, vx: 0, vy: -0.05, R: Math.min(W, H) * 0.07, born: performance.now() - 1000, ph: i, type, photo: i, emoji: EMOJIS[i], word: wordList()[i % wordList().length], hue: i * 50, dots: Array.from({ length: 14 }, () => [rand(-0.7, 0.7), rand(-0.7, 0.7), rand(0, 6)]), popping: 0 })); };
+window.__popAll = () => { for (const b of floaters) if (!b.popping) { b.popping = 0.01; popEffect(b); } };
 window.__showFrame = () => { frame = { x0: W * 0.55, y0: H * 0.25, x1: W * 0.85, y1: H * 0.65 }; frameAmt = 1; lastFrameAt = performance.now() + 4000; frameIdx = 2; };
 window.__spawnCake = () => { lastPeaceFire = 0; balloons.push({ x: W * 0.4, y: H * 0.6, vy: -1.2, born: performance.now(), ph: 0, col: ['#ffb3d1', '#ff6fa8'] }, { x: W * 0.6, y: H * 0.6, vy: -1.2, born: performance.now(), ph: 2, col: ['#b9a3ff', '#8a63ff'] }); cake = { state: 'lit', born: performance.now() - 1500, outAt: 0 }; };
 </script>
