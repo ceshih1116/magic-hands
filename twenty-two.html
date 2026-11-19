@@ -72,7 +72,7 @@
     <div class="how">
       <b>Open palm</b> — butterflies land on your fingertips<br>
       <b>Point one finger</b> — bubbles drift up (some hold your photos); poke to pop<br>
-      <b>Frame with both hands</b> — snapshot · film · halftone, one per frame<br>
+      <b>Frame with both hands</b> (two L shapes) — snapshot · film · halftone, one per frame. Hold still to snap, or tap the screen / press space<br>
       <b>Two peace signs</b> — 22 and a holographic cake<br>
       <b>Close your eyes</b> — your wish, in constellations<br>
       <b>Blow "hooo"</b> — the candles dissolve<br>
@@ -129,7 +129,10 @@ function drawCover(img, x, y, w, h) {
 /* ---------- UI ---------- */
 $('eyeBtn').onclick = () => document.body.classList.toggle('hide-ui');
 $('fsBtn').onclick = () => { try { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); } catch (e) { } };
-addEventListener('keydown', e => { if (e.target.tagName === 'INPUT') return; if (e.key === 'h' || e.key === 'H') document.body.classList.toggle('hide-ui'); });
+addEventListener('keydown', e => { if (e.target.tagName === 'INPUT') return; if (e.key === 'h' || e.key === 'H') document.body.classList.toggle('hide-ui'); if (e.code === 'Space') { e.preventDefault(); snapNow(); } });
+// tap the screen (or press space) while a frame is showing to take the picture right away
+function snapNow() { if (frame && frameAmt > 0.3) { if (frameMode !== 'snap') { frameMode = 'snap'; frameSince = performance.now(); } snapped = false; wantSnap = true; lastFrameAt = performance.now(); } }
+canvas.addEventListener('pointerdown', snapNow);
 let statusMsg = '', statusAt = 0;
 function say(m) { if (m !== statusMsg || performance.now() - statusAt > 1200) { statusMsg = m; statusAt = performance.now(); $('statusText').textContent = m; } }
 
@@ -202,11 +205,11 @@ function analyzeHand(lms, wl, side) {
   const d3 = (a, b) => w ? Math.hypot(w[a].x - w[b].x, w[a].y - w[b].y, w[a].z - w[b].z) : dist(p[a], p[b]);
   const hs3 = d3(0, 9) || 1, r = (t, q) => d3(t, 0) / (d3(q, 0) || 1);
   const ext = [r(8, 6) > 1.12, r(12, 10) > 1.12, r(16, 14) > 1.12, r(20, 18) > 1.12];
-  const thumbOut = d3(4, 5) / hs3 > 0.55;                      // thumb sticking out from the index knuckle
+  const thumbAway = Math.min(d3(4, 8), d3(4, 7)) / hs3 > 0.45 && d3(4, 5) / hs3 > 0.35;   // thumb sticks out, away from the upper index (calibrated on a real recording)
   const n = ext.filter(Boolean).length;
   const open = n >= 4;
   const peace = ext[0] && ext[1] && !ext[2] && !ext[3] && dist(p[8], p[12]) > dist(p[0], p[9]) * 0.3;
-  const ell = ext[0] && !ext[1] && !ext[2] && !ext[3] && thumbOut;     // "L" shape for the photo frame
+  const ell = r(8, 6) > 1.1 && r(12, 10) < 1.12 && r(16, 14) < 1.12 && r(20, 18) < 1.15 && thumbAway;   // "L" shape for the frame
   const point = ext[0] && !ext[1] && !ext[2] && !ext[3];           // ☝️ index finger only
   return { p, open, peace, ell, point, side, size: dist(p[0], p[9]) };
 }
@@ -407,7 +410,7 @@ function drawFloaters() {
 }
 
 /* ---------- 🖼 Finger frame ---------- */
-let frame = null, frameAmt = 0, frameIdx = -1, lastFrameAt = 0, frameStreak = 0;
+let frame = null, frameAmt = 0, frameIdx = -1, lastFrameAt = 0, frameStreak = 0, lastBox = null, wantSnap = false;
 const FRAME_MODES = ['snap', 'film', 'halftone'];     // each new frame switches to the next effect
 let frameMode = 'snap', memIdx = -1, frameSince = 0, snapped = false, flashAt = -1e9;
 const polaroids = [];
@@ -455,21 +458,25 @@ function updateFrame(hands, now, dt) {
     const pts = [ls[0].p[4], ls[0].p[8], ls[1].p[4], ls[1].p[8]];
     const xs = pts.map(q => q.x), ys = pts.map(q => q.y);
     const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
-    const minS = (ls[0].size + ls[1].size) / 2 * 0.8;
+    const minS = (ls[0].size + ls[1].size) / 2 * 0.6;
     const apart = Math.abs(ls[0].p[0].x - ls[1].p[0].x) > minS;
     if (x1 - x0 > minS && y1 - y0 > minS * 0.6 && apart) box = { x0, y0, x1, y1 };
   }
   frameStreak = box ? frameStreak + 1 : 0;
+  if (box) lastBox = { box, t: now };
+  if (!box && lastBox && now - lastBox.t < 400 && frameAmt > 0.3) { box = lastBox.box; frameStreak = 2; }   // ride over short detection gaps
   if (box && frameStreak >= 2) {
     if (frameAmt < 0.05 && now - lastFrameAt > 600) { frameIdx++; frameMode = FRAME_MODES[frameIdx % FRAME_MODES.length]; if (frameMode === 'memory') memIdx++; frameSince = now; snapped = false; sparkle((box.x0 + box.x1) / 2, (box.y0 + box.y1) / 2, 20, 60); }
     lastFrameAt = now;
     frame = frame ? { x0: lerp(frame.x0, box.x0, ease(dt, 16)), y0: lerp(frame.y0, box.y0, ease(dt, 16)), x1: lerp(frame.x1, box.x1, ease(dt, 16)), y1: lerp(frame.y1, box.y1, ease(dt, 16)) } : box;
     frameAmt = lerp(frameAmt, 1, ease(dt, 8));
     if (frameMode === 'snap') {
-      if (!snapped && now - frameSince > 800 && frameAmt > 0.85) { snapped = true; takeSnapshot(frame, now); }
+      if (!snapped && now - frameSince > 600 && frameAmt > 0.6) { snapped = true; takeSnapshot(frame, now); }
       say(snapped ? 'Captured — frame again for the next effect' : 'Hold still…');
     } else say(frameMode === 'film' ? 'Film window' : 'Halftone');
   } else if (now - lastFrameAt > 250) frameAmt = lerp(frameAmt, 0, ease(dt, 6));
+  // tap / space: take the picture right away, even if tracking just blinked
+  if (wantSnap) { if (frame && frameAmt > 0.3) { snapped = true; takeSnapshot(frame, now); say('Captured'); } wantSnap = false; }
 }
 const halfC = document.createElement('canvas'), hcx = halfC.getContext('2d', { willReadFrequently: true });
 function drawFrame(now) {
@@ -496,7 +503,7 @@ function drawFrame(now) {
     for (const [cx, cy, sx, sy] of [[x0, y0, 1, 1], [x1, y0, -1, 1], [x0, y1, 1, -1], [x1, y1, -1, -1]]) { ctx.beginPath(); ctx.moveTo(cx, cy + sy * L); ctx.lineTo(cx, cy); ctx.lineTo(cx + sx * L, cy); ctx.stroke(); }
     ctx.shadowBlur = 0;
     if (!snapped) {
-      const k = clamp((now - frameSince) / 800, 0, 1);         // little countdown ring
+      const k = clamp((now - frameSince) / 600, 0, 1);         // little countdown ring
       ctx.beginPath(); ctx.arc((x0 + x1) / 2, (y0 + y1) / 2, Math.min(w, h) * 0.07, -Math.PI / 2, -Math.PI / 2 + k * Math.PI * 2); ctx.lineWidth = 1.5; ctx.stroke();
       ctx.beginPath(); ctx.moveTo((x0 + x1) / 2 - 8, (y0 + y1) / 2); ctx.lineTo((x0 + x1) / 2 + 8, (y0 + y1) / 2); ctx.moveTo((x0 + x1) / 2, (y0 + y1) / 2 - 8); ctx.lineTo((x0 + x1) / 2, (y0 + y1) / 2 + 8); ctx.lineWidth = 1; ctx.stroke();
     }
@@ -623,7 +630,7 @@ const consLinks = []; cons.forEach((a, i) => { const near = cons.map((b, j) => [
 function drawWish(t) {
   if (wishAmt < 0.02) return;
   ctx.save();
-  ctx.fillStyle = `rgba(4,7,14,${0.62 * wishAmt})`; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = `rgba(6,10,20,${0.5 * wishAmt})`; ctx.fillRect(0, 0, W, H);
   // constellation
   ctx.globalAlpha = wishAmt; ctx.strokeStyle = 'rgba(200,225,255,0.28)'; ctx.lineWidth = 0.6;
   ctx.beginPath(); for (const [i, j] of consLinks) { const k = clamp(wishAmt * 1.4 - (i % 7) * 0.05, 0, 1); const a = cons[i], b = cons[j];
@@ -694,7 +701,7 @@ function drawHandHUD() {
   ctx.restore();
 }
 const grainC = document.createElement('canvas'); grainC.width = grainC.height = 160;
-(() => { const g = grainC.getContext('2d'), im = g.createImageData(160, 160); for (let i = 0; i < im.data.length; i += 4) { const v = Math.random() * 255; im.data[i] = im.data[i + 1] = im.data[i + 2] = v; im.data[i + 3] = 22; } g.putImageData(im, 0, 0); })();
+(() => { const g = grainC.getContext('2d'), im = g.createImageData(160, 160); for (let i = 0; i < im.data.length; i += 4) { const v = Math.random() * 255; im.data[i] = im.data[i + 1] = im.data[i + 2] = v; im.data[i + 3] = 11; } g.putImageData(im, 0, 0); })();
 function drawGrain() { ctx.save(); ctx.globalCompositeOperation = 'overlay'; const ox = Math.random() * 160, oy = Math.random() * 160; ctx.translate(-ox, -oy); ctx.fillStyle = ctx.createPattern(grainC, 'repeat'); ctx.fillRect(0, 0, W + 160, H + 160); ctx.restore(); }
 
 /* ---------- Main loop ---------- */
@@ -724,11 +731,11 @@ function loop() {
 
   // camera (mirrored) with a soft birthday glow
   ctx.fillStyle = '#07090d'; ctx.fillRect(0, 0, W, H);
-  if (video.readyState >= 2) { const c = cover(); ctx.save(); ctx.filter = 'saturate(0.82) contrast(1.06) brightness(0.98)'; ctx.translate(W, 0); ctx.scale(-1, 1); ctx.drawImage(video, c.ox, c.oy, c.dw, c.dh); ctx.restore(); }
+  if (video.readyState >= 2) { const c = cover(); ctx.save(); ctx.filter = 'saturate(0.96) contrast(1.02) brightness(1.07)'; ctx.translate(W, 0); ctx.scale(-1, 1); ctx.drawImage(video, c.ox, c.oy, c.dw, c.dh); ctx.restore(); }
   // cool cinematic grade + vignette
-  ctx.save(); ctx.globalCompositeOperation = 'soft-light'; ctx.globalAlpha = 0.35; ctx.fillStyle = '#2a4a6e'; ctx.fillRect(0, 0, W, H); ctx.restore();
-  const vg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.38, W / 2, H / 2, Math.max(W, H) * 0.78);
-  vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, `rgba(3,6,12,${0.55 - beat * 0.15})`); ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
+  ctx.save(); ctx.globalCompositeOperation = 'soft-light'; ctx.globalAlpha = 0.14; ctx.fillStyle = '#a9c8e8'; ctx.fillRect(0, 0, W, H); ctx.restore();   // a light cool tint
+  const vg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.5, W / 2, H / 2, Math.max(W, H) * 0.85);
+  vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, `rgba(10,16,26,${0.16 - beat * 0.06})`); ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
   drawHandHUD();
 
   drawGrain();
