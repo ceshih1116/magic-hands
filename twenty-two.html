@@ -45,6 +45,7 @@
   #thumbs img { width: 44px; height: 44px; object-fit: cover; border-radius: 50%; border: 1px solid rgba(255,255,255,.5); filter: saturate(.85); }
   .card input[type=text] { width: 100%; padding: 10px 12px; border-radius: 4px; border: 1px solid rgba(255,255,255,.14); font: 400 13px "IBM Plex Mono", monospace; background: rgba(255,255,255,.04); color: #e9eef5; }
   .two { display: flex; gap: 8px; }
+  .card input[type=date] { width: 100%; padding: 9px 12px; border-radius: 4px; border: 1px solid rgba(255,255,255,.14); font: 400 13px "IBM Plex Mono", monospace; background: rgba(255,255,255,.04); color: #e9eef5; color-scheme: dark; }
   #startBtn { width: 100%; margin-top: 8px; padding: 14px; border: 1px solid rgba(255,255,255,.85); border-radius: 4px; cursor: pointer; color: #07090d; background: #e9eef5;
     font: 500 12px "IBM Plex Mono", monospace; letter-spacing: .18em; text-transform: uppercase; }
   #startBtn:hover { background: #fff; }
@@ -82,6 +83,10 @@
       <label class="t">Your photos (up to 12, they never leave your device)</label>
       <label class="file">📷 <span id="photoLabel">Choose photos</span><input type="file" id="photoIn" accept="image/*" multiple></label>
       <div id="thumbs"></div>
+    </div>
+    <div class="row">
+      <label class="t">Birthday (printed on your photos)</label>
+      <input type="date" id="bday">
     </div>
     <div class="row">
       <label class="t">Your wish</label>
@@ -415,7 +420,14 @@ function requestShot() { if (!snapped) { snapped = true; pendingShot = true; } }
 const FRAME_MODES = ['snap', 'film', 'halftone'];     // each new frame switches to the next effect
 let frameMode = 'snap', memIdx = -1, frameSince = 0, snapped = false, flashAt = -1e9;
 const polaroids = [];
-const DATE_STAMP = (() => { const d = new Date(); return "'" + String(d.getFullYear()).slice(2) + ' ' + String(d.getMonth() + 1).padStart(2, ' ') + ' ' + String(d.getDate()).padStart(2, '0'); })();
+// birthday date: from the setup field (defaults to today; a personal build can preset it)
+let DATE_STAMP = '', DATE_DOTS = '';
+function setDate(iso) {
+  const d = iso ? new Date(iso + 'T12:00:00') : new Date();
+  const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), dd = String(d.getDate()).padStart(2, '0');
+  DATE_STAMP = "'" + String(y).slice(2) + ' ' + m + ' ' + dd; DATE_DOTS = `${y}.${m}.${dd}`;
+}
+(() => { const el = $('bday'), d = new Date(); el.value = window.__PRESET_DATE || `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; setDate(el.value); el.onchange = () => setDate(el.value); })();
 // draw the live (mirrored) camera so that it lines up with a screen rectangle
 function drawLive(x, y, w, h) { const c = cover(); ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip(); ctx.translate(W, 0); ctx.scale(-1, 1); ctx.drawImage(video, c.ox, c.oy, c.dw, c.dh); ctx.restore(); }
 function takeSnapshot(f, now, fromCanvas) {
@@ -458,7 +470,7 @@ function drawPolaroids(now) {
     if (dev > 0) { ctx.fillStyle = `rgba(250,248,240,${dev})`; ctx.fillRect(-iw / 2, -ih / 2, iw, ih); }
     ctx.restore();
     ctx.fillStyle = '#2a2f38'; ctx.font = `400 ${pad * 1.15}px "IBM Plex Mono", monospace`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-    ctx.fillText('22 — ' + DATE_STAMP.replace("'", '20').replace(/ /g, '.').replace('..', '.'), -iw / 2, ih / 2 + pad * 1.7);
+    ctx.fillText('22 — ' + DATE_DOTS, -iw / 2, ih / 2 + pad * 1.7);
     ctx.restore();
   }
   const fk = (now - flashAt) / 350;                            // shutter flash
@@ -581,57 +593,101 @@ function drawBalloons(now) {
 }
 function drawCake(now, t) {
   if (!cake) return;
-  const age = (now - cake.born) / 1000, inA = clamp(age / 1.0, 0, 1);
+  const age = (now - cake.born) / 1000, inA = clamp(age / 1.2, 0, 1), e = inA * inA * (3 - 2 * inA);
   if (cake.state === 'out' && now - cake.outAt > 7000) { cake = null; return; }
-  const cw = Math.min(W * 0.3, 340), cx = W / 2, base = H - 18 + (1 - inA) * 80;
-  const rot = t * 0.6, tilt = 0.28;
-  ctx.save(); ctx.globalAlpha = inA; ctx.lineCap = 'round';
-  const line = (a) => `rgba(200,232,255,${a})`;
-  // rotating HUD ring on the "plate"
-  ctx.strokeStyle = line(0.5); ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.ellipse(cx, base, cw * 0.66, cw * 0.66 * tilt, 0, 0, Math.PI * 2); ctx.stroke();
-  for (let i = 0; i < 48; i++) { const a = i / 48 * Math.PI * 2 + rot * 0.5, r1 = cw * 0.66, r2 = r1 * (i % 4 ? 0.96 : 0.92);
+  const cw = Math.min(W * 0.34, 380), cx = W / 2, base = H - 22 + (1 - e) * 90;
+  const rot = t * 0.45, tilt = 0.26, lit = cake.state === 'lit';
+  ctx.save(); ctx.globalAlpha = e; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  const iri = (x0, x1, y, a) => { const g = ctx.createLinearGradient(x0, y, x1, y);
+    g.addColorStop(0, `rgba(255,205,232,${a})`); g.addColorStop(0.5, `rgba(255,255,255,${a})`); g.addColorStop(1, `rgba(190,225,255,${a})`); return g; };
+
+  // floor glow + rotating HUD ring
+  const fg = ctx.createRadialGradient(cx, base, 0, cx, base, cw * 0.8);
+  fg.addColorStop(0, `rgba(255,236,210,${lit ? 0.22 : 0.08})`); fg.addColorStop(1, 'rgba(255,236,210,0)');
+  ctx.fillStyle = fg; ctx.beginPath(); ctx.ellipse(cx, base, cw * 0.8, cw * 0.8 * tilt, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = 'rgba(210,232,255,0.35)'; ctx.lineWidth = 0.8;
+  ctx.beginPath(); ctx.ellipse(cx, base, cw * 0.7, cw * 0.7 * tilt, 0, 0, Math.PI * 2); ctx.stroke();
+  for (let i = 0; i < 72; i++) { const a = i / 72 * Math.PI * 2 + rot * 0.3, r1 = cw * 0.7, r2 = r1 * (i % 6 ? 0.975 : 0.94);
     ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * r1, base + Math.sin(a) * r1 * tilt); ctx.lineTo(cx + Math.cos(a) * r2, base + Math.sin(a) * r2 * tilt); ctx.stroke(); }
-  // wireframe tiers (cylinders)
-  const tier = (r, y, h) => {
-    const rr = r * tilt, g = ctx.createLinearGradient(0, y - h, 0, y);
-    g.addColorStop(0, 'rgba(170,215,255,0.10)'); g.addColorStop(1, 'rgba(170,215,255,0.02)');
-    ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(cx, y, r, rr, 0, 0, Math.PI); ctx.lineTo(cx - r, y - h); ctx.ellipse(cx, y - h, r, rr, 0, Math.PI, 0, true); ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = line(0.85); ctx.lineWidth = 1; ctx.shadowColor = '#9fd2ff'; ctx.shadowBlur = 6;
-    ctx.beginPath(); ctx.ellipse(cx, y - h, r, rr, 0, 0, Math.PI * 2); ctx.stroke();
-    ctx.beginPath(); ctx.ellipse(cx, y, r, rr, 0, 0, Math.PI); ctx.stroke();
+
+  // tiers: pearly glass body, iridescent rims, frosting drips and pearls
+  const scanY = (t * 0.33 % 1);                       // scan band position (0 = bottom, 1 = top)
+  const tiers = [[0.5, 0.2], [0.36, 0.17], [0.23, 0.15]];
+  let y = base - 6; const totalH = tiers.reduce((a, [, h]) => a + h * cw, 0);
+  tiers.forEach(([rf, hf], ti) => {
+    const r = cw * rf, h = cw * hf, rr = r * tilt, top = y - h;
+    // body
+    const bg = ctx.createLinearGradient(0, top, 0, y);
+    bg.addColorStop(0, 'rgba(255,245,252,0.20)'); bg.addColorStop(0.5, 'rgba(225,236,255,0.10)'); bg.addColorStop(1, 'rgba(255,225,240,0.16)');
+    ctx.fillStyle = bg; ctx.beginPath(); ctx.ellipse(cx, y, r, rr, 0, 0, Math.PI); ctx.lineTo(cx - r, top); ctx.ellipse(cx, top, r, rr, 0, Math.PI, 0, true); ctx.closePath(); ctx.fill();
+    // inner light from the candles
+    if (lit) { const ig = ctx.createRadialGradient(cx, top, 0, cx, top, r * 1.2); ig.addColorStop(0, 'rgba(255,230,200,0.16)'); ig.addColorStop(1, 'rgba(255,230,200,0)'); ctx.fillStyle = ig; ctx.fill(); }
+    // top surface
+    ctx.fillStyle = 'rgba(255,255,255,0.10)'; ctx.beginPath(); ctx.ellipse(cx, top, r, rr, 0, 0, Math.PI * 2); ctx.fill();
+    // faint rotating meridians (hologram)
+    for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2 + rot * (ti % 2 ? -1 : 1); if (Math.sin(a) < 0) continue;
+      const x = cx + Math.cos(a) * r, yo = Math.sin(a) * rr; ctx.strokeStyle = 'rgba(220,236,255,0.16)'; ctx.lineWidth = 0.6;
+      ctx.beginPath(); ctx.moveTo(x, y + yo); ctx.lineTo(x, top + yo); ctx.stroke(); }
+    // rims
+    ctx.shadowColor = 'rgba(200,225,255,0.9)'; ctx.shadowBlur = 8; ctx.lineWidth = 1.1;
+    ctx.strokeStyle = iri(cx - r, cx + r, top, 0.95); ctx.beginPath(); ctx.ellipse(cx, top, r, rr, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = iri(cx - r, cx + r, y, 0.75); ctx.beginPath(); ctx.ellipse(cx, y, r, rr, 0, 0, Math.PI); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx - r, y); ctx.lineTo(cx - r, top); ctx.moveTo(cx + r, y); ctx.lineTo(cx + r, top); ctx.stroke();
     ctx.shadowBlur = 0;
-    for (let i = 0; i < 16; i++) {               // vertical lines rotating around the cylinder
-      const a = i / 16 * Math.PI * 2 + rot, front = Math.sin(a) > 0;
-      ctx.strokeStyle = line(front ? 0.6 : 0.15);
-      const x = cx + Math.cos(a) * r, yo = Math.sin(a) * rr;
-      ctx.beginPath(); ctx.moveTo(x, y + yo); ctx.lineTo(x, y - h + yo); ctx.stroke();
+    // frosting: a soft wavy edge under the top rim, plus a few rounded drips
+    ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 0.9; ctx.beginPath();
+    for (let i = 0; i <= 48; i++) {
+      const a = i / 48 * Math.PI, x = cx + Math.cos(a) * r, yy = top + Math.sin(a) * rr + h * (0.07 + 0.045 * Math.sin(i * 1.15 + ti * 2));
+      i ? ctx.lineTo(x, yy) : ctx.moveTo(x, yy);
     }
-    ctx.strokeStyle = line(0.25); ctx.beginPath(); ctx.ellipse(cx, y - h * 0.5, r, rr, 0, 0, Math.PI); ctx.stroke();
-  };
-  const r1 = cw * 0.5, h1 = cw * 0.24, r2 = cw * 0.34, h2 = cw * 0.2;
-  tier(r1, base - 4, h1); tier(r2, base - 4 - h1, h2);
-  const top = base - 4 - h1 - h2;
-  // "22" candles as light bars + flames as glowing orbs
-  const lit = cake.state === 'lit';
-  for (const [i, dx] of [[0, -0.09], [1, 0.09]]) {
-    const x = cx + cw * dx, y = top, hgt = cw * 0.2;
-    ctx.strokeStyle = line(0.9); ctx.lineWidth = 1; ctx.strokeRect(x - 3, y - hgt, 6, hgt);
-    ctx.font = `400 ${cw * 0.09}px "IBM Plex Mono", monospace`; ctx.fillStyle = line(0.8); ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText('2', x, y - hgt * 0.8);
-    const fy = y - hgt - 12;
+    ctx.stroke();
+    for (let k = 0; k < 6 - ti; k++) {
+      const a = (k + 0.5) / (6 - ti) * Math.PI + Math.sin(k * 3.1 + ti) * 0.12;
+      const x = cx + Math.cos(a) * r, y0 = top + Math.sin(a) * rr + h * 0.08, len = h * (0.18 + 0.22 * Math.abs(Math.sin(k * 1.7 + ti * 0.9))), dw = Math.max(2, r * 0.025);
+      ctx.beginPath(); ctx.moveTo(x - dw, y0); ctx.lineTo(x - dw, y0 + len); ctx.arc(x, y0 + len, dw, Math.PI, 0, true); ctx.lineTo(x + dw, y0);
+      ctx.fillStyle = 'rgba(255,255,255,0.16)'; ctx.fill(); ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.stroke();
+    }
+    // pearls along the bottom edge
+    for (let i = 1; i < 18; i++) { const a = i / 18 * Math.PI, x = cx + Math.cos(a) * r, yy = y + Math.sin(a) * rr;
+      ctx.fillStyle = `rgba(255,250,245,${0.55 + 0.45 * Math.sin(t * 3 + i)})`; ctx.shadowColor = '#fff'; ctx.shadowBlur = 4; ctx.beginPath(); ctx.arc(x, yy - 2, 1.6, 0, Math.PI * 2); ctx.fill(); }
+    ctx.shadowBlur = 0;
+    y = top;
+  });
+  // scan band sweeping up the cake
+  const sy = base - 6 - scanY * totalH, sr = cw * lerp(0.5, 0.23, scanY);
+  const sg = ctx.createLinearGradient(0, sy - 6, 0, sy + 6); sg.addColorStop(0, 'rgba(200,230,255,0)'); sg.addColorStop(0.5, 'rgba(220,240,255,0.35)'); sg.addColorStop(1, 'rgba(200,230,255,0)');
+  ctx.fillStyle = sg; ctx.beginPath(); ctx.ellipse(cx, sy, sr, sr * tilt, 0, 0, Math.PI * 2); ctx.fill();
+
+  // number candles "2" "2" and their flames
+  const topY = y;
+  for (const [i, dx] of [[0, -0.075], [1, 0.075]]) {
+    const x = cx + cw * dx, fs = cw * 0.2;
+    ctx.font = `400 ${fs}px "Instrument Serif", serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = 'rgba(255,248,252,0.18)'; ctx.fillText('2', x, topY + 2);
+    ctx.strokeStyle = iri(x - fs / 2, x + fs / 2, topY, 0.95); ctx.lineWidth = 1.1; ctx.shadowColor = 'rgba(220,235,255,0.9)'; ctx.shadowBlur = 8; ctx.strokeText('2', x, topY + 2); ctx.shadowBlur = 0;
+    const wy = topY - fs * 0.78;
+    ctx.strokeStyle = 'rgba(80,70,70,0.9)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, wy); ctx.lineTo(x, wy - 7); ctx.stroke();
+    const fy = wy - 7;
     if (lit) {
-      const fl = 1 + Math.sin(t * 17 + i * 2) * 0.1 + beat * 0.35;
+      const fl = 1 + Math.sin(t * 15 + i * 2) * 0.08 + beat * 0.3, sway = Math.sin(t * 5 + i) * 1.4;
       ctx.save(); ctx.globalCompositeOperation = 'lighter';
-      const g = ctx.createRadialGradient(x, fy, 0, x, fy, 34 * fl); g.addColorStop(0, 'rgba(255,240,215,0.95)'); g.addColorStop(0.25, 'rgba(255,214,160,0.45)'); g.addColorStop(1, 'rgba(255,200,140,0)');
-      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, fy, 34 * fl, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#fffaf0'; ctx.beginPath(); ctx.ellipse(x, fy, 2.6, 6 * fl, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
-      if (Math.random() < 0.25) parts.push({ k: 'u', x: x + rand(-2, 2), y: fy - 6, vx: 0, vy: rand(-1, -0.4), r: rand(0.8, 1.6), life: 1, d: 0.03, ph: rand(0, 6) });
+      const g = ctx.createRadialGradient(x, fy - 8, 0, x, fy - 8, 46 * fl); g.addColorStop(0, 'rgba(255,236,205,0.75)'); g.addColorStop(0.3, 'rgba(255,214,170,0.25)'); g.addColorStop(1, 'rgba(255,200,150,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, fy - 8, 46 * fl, 0, Math.PI * 2); ctx.fill();
+      const tg = ctx.createLinearGradient(x, fy - 22 * fl, x, fy);
+      tg.addColorStop(0, 'rgba(255,250,235,0.95)'); tg.addColorStop(0.6, 'rgba(255,214,150,0.95)'); tg.addColorStop(1, 'rgba(255,150,90,0.6)');
+      ctx.fillStyle = tg; ctx.beginPath(); ctx.moveTo(x + sway, fy - 22 * fl); ctx.bezierCurveTo(x + 7, fy - 10, x + 6, fy, x, fy); ctx.bezierCurveTo(x - 6, fy, x - 7, fy - 10, x + sway, fy - 22 * fl); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.95)'; ctx.beginPath(); ctx.ellipse(x, fy - 5, 1.8, 4, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+      if (Math.random() < 0.2) parts.push({ k: 'u', x: x + rand(-2, 2), y: fy - 18, vx: 0, vy: rand(-0.9, -0.3), r: rand(0.7, 1.4), life: 1, d: 0.03, ph: rand(0, 6) });
     } else if (now - cake.outAt < 3000 && Math.random() < 0.5) parts.push({ k: 'u', x: x + rand(-3, 3), y: fy, vx: rand(-0.2, 0.2), vy: rand(-1.6, -0.6), r: rand(0.8, 2), life: 1, d: rand(0.008, 0.015), ph: rand(0, 6) });
     if (i === 0) cake.wick = [{ x, y: fy }]; else cake.wick.push({ x, y: fy });
   }
+  // light motes drifting around the cake
+  for (let i = 0; i < 16; i++) { const a = t * 0.35 + i * 0.39, rr = cw * (0.55 + 0.12 * Math.sin(i * 1.7)), yy = base - totalH * (0.15 + 0.7 * ((i * 0.37 + t * 0.05) % 1));
+    const x = cx + Math.cos(a) * rr, zf = Math.sin(a); ctx.fillStyle = `rgba(255,248,236,${0.25 + 0.5 * (zf + 1) / 2})`; ctx.beginPath(); ctx.arc(x, yy, 0.8 + (zf + 1) * 0.6, 0, Math.PI * 2); ctx.fill(); }
   // HUD label
-  ctx.font = `400 10px "IBM Plex Mono", monospace`; ctx.fillStyle = line(0.6); ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-  ctx.fillText(lit ? 'CANDLES  ·  02 / LIT' : 'CANDLES  ·  00 / OUT', cx + cw * 0.7, base - 6);
+  ctx.font = `400 10px "IBM Plex Mono", monospace`; ctx.fillStyle = 'rgba(220,235,255,0.6)'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  ctx.fillText(lit ? '22  ·  CANDLES LIT' : '22  ·  WISH SENT', cx + cw * 0.74, base - 4);
   ctx.restore();
 }
 
@@ -761,7 +817,7 @@ function loop() {
     ctx.save(); ctx.globalAlpha = Math.min(1, (1 - k) * 2, k * 6); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.font = `italic 400 ${fs}px "Instrument Serif", serif`; ctx.fillStyle = '#f4f8fc'; ctx.shadowColor = 'rgba(170,210,255,0.8)'; ctx.shadowBlur = 22;
     ctx.fillText('Happy twenty-second', W / 2, H * 0.17);
-    ctx.shadowBlur = 0; ctx.font = `400 11px "IBM Plex Mono", monospace`; ctx.fillStyle = 'rgba(220,235,255,0.7)'; ctx.fillText('B I R T H D A Y   ·   ' + DATE_STAMP.replace("'", '20').trim().replace(/ +/g, '.'), W / 2, H * 0.17 + fs * 0.7);
+    ctx.shadowBlur = 0; ctx.font = `400 11px "IBM Plex Mono", monospace`; ctx.fillStyle = 'rgba(220,235,255,0.7)'; ctx.fillText('B I R T H D A Y   ·   ' + DATE_DOTS, W / 2, H * 0.17 + fs * 0.7);
     ctx.restore();
   }
 }
