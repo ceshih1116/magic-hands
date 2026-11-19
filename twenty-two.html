@@ -5,49 +5,52 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Twenty-Two · AR Birthday</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600;700&family=Baloo+2:wght@700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { width: 100%; height: 100%; overflow: hidden; background: #1b1020; color: #fff;
-    font-family: -apple-system, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #07090d; color: #e9eef5;
+    font-family: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace; }
   video { position: fixed; left: 0; top: 0; width: 2px; height: 2px; opacity: 0.01; pointer-events: none; z-index: -1; } /* iPhone Safari will not play a display:none video */
   canvas#c { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
   .ui { transition: opacity .35s ease; }
   body.hide-ui .ui { opacity: 0; pointer-events: none; }
-  body.hide-ui #eyeBtn { opacity: .15; }
-  .pill { background: rgba(40, 15, 40, .4); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(255,255,255,.22); border-radius: 999px; }
-  #status { position: fixed; top: 16px; left: 16px; z-index: 5; padding: 7px 14px; font-size: 14px; display: flex; gap: 8px; align-items: center; }
-  #beatDot { width: 9px; height: 9px; border-radius: 50%; background: rgba(255,255,255,.35); transition: transform .08s; }
-  #tools { position: fixed; top: 16px; right: 62px; z-index: 5; display: flex; gap: 8px; }
-  .btn { height: 38px; min-width: 38px; padding: 0 13px; cursor: pointer; color: #fff; font-size: 14px;
-    background: rgba(40, 15, 40, .4); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(255,255,255,.22); border-radius: 999px; }
-  .btn:hover { background: rgba(255,255,255,.2); }
-  .btn.on { background: rgba(255, 140, 190, .55); }
+  body.hide-ui #eyeBtn { opacity: .12; }
+  .pill { background: rgba(8, 12, 18, .45); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,.14); border-radius: 4px; }
+  #status { position: fixed; top: 16px; left: 16px; z-index: 5; padding: 7px 12px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; display: flex; gap: 9px; align-items: center; }
+  #beatDot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.35); transition: transform .08s; }
+  #tools { position: fixed; top: 16px; right: 58px; z-index: 5; display: flex; gap: 6px; }
+  .btn { height: 32px; min-width: 32px; padding: 0 11px; cursor: pointer; color: #e9eef5; font: 500 11px "IBM Plex Mono", monospace; letter-spacing: .08em; text-transform: uppercase;
+    background: rgba(8, 12, 18, .45); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,.14); border-radius: 4px; }
+  .btn:hover { background: rgba(255,255,255,.12); }
+  .btn.on { border-color: rgba(160,210,255,.8); color: #bfe3ff; }
   #eyeBtn { position: fixed; top: 16px; right: 16px; z-index: 6; transition: opacity .35s; }
 
   #setup { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; overflow-y: auto; padding: 16px;
-    background: radial-gradient(ellipse at top, #ffd6e8 0%, #f3b6d4 35%, #8f6bc7 100%); }
-  .card { width: min(520px, 94vw); max-height: calc(100vh - 32px); overflow-y: auto; padding: 26px; border-radius: 24px;
-    background: rgba(255,255,255,.22); border: 1px solid rgba(255,255,255,.5); box-shadow: 0 20px 60px rgba(90,40,110,.35); color: #4a2150; }
-  .card h1 { font-family: "Baloo 2", sans-serif; font-size: 46px; line-height: 1; color: #fff; text-shadow: 0 4px 20px rgba(160,60,140,.45); }
-  .card h1 small { display: block; font-family: "Dancing Script", cursive; font-size: 26px; margin-top: 6px; }
-  .how { margin: 16px 0 18px; font-size: 14px; line-height: 1.95; }
-  .row { margin-bottom: 14px; }
-  .row label.t { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
-  .file { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 14px; cursor: pointer; font-size: 14px;
-    background: rgba(255,255,255,.55); border: 1px dashed rgba(120,50,120,.45); }
+    background: radial-gradient(ellipse at 50% 0%, #1b2433 0%, #07090d 70%); }
+  .card { width: min(540px, 94vw); max-height: calc(100vh - 32px); overflow-y: auto; padding: 30px 30px 26px; border-radius: 6px;
+    background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.1); }
+  .card h1 { font-family: "Instrument Serif", serif; font-weight: 400; font-size: 56px; line-height: .95; letter-spacing: -.01em; }
+  .card h1 i { color: #bfe3ff; }
+  .card .kicker { font-size: 11px; letter-spacing: .2em; text-transform: uppercase; opacity: .55; margin-bottom: 14px; }
+  .how { margin: 18px 0 18px; font-size: 12px; line-height: 1.85; opacity: .85; border-top: 1px solid rgba(255,255,255,.08); padding-top: 14px; }
+  .how b { font-weight: 500; color: #fff; }
+  .row { margin-bottom: 16px; }
+  .row label.t { display: block; font-size: 10px; letter-spacing: .16em; text-transform: uppercase; opacity: .55; margin-bottom: 8px; }
+  .file { display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;
+    background: rgba(255,255,255,.04); border: 1px dashed rgba(255,255,255,.22); }
   .file input { display: none; }
-  #thumbs { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
-  #thumbs img { width: 52px; height: 52px; object-fit: cover; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
-  .card input[type=text] { width: 100%; padding: 9px 12px; border-radius: 12px; border: 1px solid rgba(120,50,120,.3); font-size: 15px; background: rgba(255,255,255,.7); color: #4a2150; }
+  #thumbs { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  #thumbs img { width: 44px; height: 44px; object-fit: cover; border-radius: 50%; border: 1px solid rgba(255,255,255,.5); filter: saturate(.85); }
+  .card input[type=text] { width: 100%; padding: 10px 12px; border-radius: 4px; border: 1px solid rgba(255,255,255,.14); font: 400 13px "IBM Plex Mono", monospace; background: rgba(255,255,255,.04); color: #e9eef5; }
   .two { display: flex; gap: 8px; }
-  #startBtn { width: 100%; margin-top: 6px; padding: 14px; border: none; border-radius: 999px; font-size: 17px; font-weight: 700; cursor: pointer; color: #fff;
-    background: linear-gradient(135deg, #ff7eb6, #a97bff); box-shadow: 0 10px 30px rgba(200,80,160,.4); }
-  #startBtn:disabled { opacity: .6; cursor: wait; }
-  #err { color: #7a1030; font-size: 13px; margin-top: 8px; min-height: 16px; }
-  .note { font-size: 12px; opacity: .75; margin-top: 6px; }
+  #startBtn { width: 100%; margin-top: 8px; padding: 14px; border: 1px solid rgba(255,255,255,.85); border-radius: 4px; cursor: pointer; color: #07090d; background: #e9eef5;
+    font: 500 12px "IBM Plex Mono", monospace; letter-spacing: .18em; text-transform: uppercase; }
+  #startBtn:hover { background: #fff; }
+  #startBtn:disabled { opacity: .5; cursor: wait; }
+  #err { color: #ff9aa8; font-size: 12px; margin-top: 10px; min-height: 16px; }
+  .note { font-size: 10px; letter-spacing: .06em; opacity: .45; margin-top: 8px; }
 </style>
 </head>
 <body>
@@ -56,23 +59,24 @@
 
 <div id="status" class="pill ui"><span id="beatDot"></span><span id="statusText">Waiting for camera…</span></div>
 <div id="tools" class="ui">
-  <button class="btn" id="musicBtn" title="Listen to the music in the room with the microphone and pulse with the beat">🎵 Music sync</button>
-  <button class="btn" id="recBtn">⏺ Record</button>
+  <button class="btn" id="musicBtn" title="Listen to the music in the room with the microphone and pulse with the beat">Music sync</button>
+  <button class="btn" id="recBtn">● Rec</button>
   <button class="btn" id="fsBtn" title="Fullscreen">⛶</button>
 </div>
 <button class="btn" id="eyeBtn" title="Hide the interface (or press H)">👁</button>
 
 <div id="setup">
   <div class="card">
-    <h1>Twenty-Two <small>an AR birthday</small></h1>
+    <div class="kicker">AR · Birthday · 22</div>
+    <h1>Twenty-<i>two</i></h1>
     <div class="how">
-      🦋 <b>Open your palm</b> — butterflies come out and sit on your fingertips<br>
-      ☝️ <b>Point one finger</b> — bubbles float up (some hold your photos); poke them to pop<br>
-      🖼 <b>Make a frame</b> with both thumbs &amp; index fingers — each new frame is a different effect: a childhood photo, a polaroid snapshot of you, or a retro film window<br>
-      ✌️✌️ <b>Two peace signs</b> — "2" + "2" balloons and a birthday cake<br>
-      😌 <b>Close your eyes</b> — make a wish<br>
-      🌬 <b>Blow ("hooo")</b> at the cake — candles out, confetti!<br>
-      🎵 <b>Music sync</b> — play your song out loud and everything bounces to the beat
+      <b>Open palm</b> — butterflies land on your fingertips<br>
+      <b>Point one finger</b> — bubbles drift up (some hold your photos); poke to pop<br>
+      <b>Frame with both hands</b> — snapshot · film · halftone, one per frame<br>
+      <b>Two peace signs</b> — 22 and a holographic cake<br>
+      <b>Close your eyes</b> — your wish, in constellations<br>
+      <b>Blow "hooo"</b> — the candles dissolve<br>
+      <b>Music sync</b> — play your song out loud; everything moves to the beat
     </div>
     <div class="row">
       <label class="t">Your photos (up to 12, they never leave your device)</label>
@@ -83,7 +87,7 @@
       <label class="t">Your wish</label>
       <div class="two"><input type="text" id="wish1" value="Þetta reddast" maxlength="30"><input type="text" id="wish2" value="always be happy" maxlength="30"></div>
     </div>
-    <button id="startBtn">Turn on camera 🎂</button>
+    <button id="startBtn">Turn on camera</button>
     <div id="err"></div>
     <div class="note">Use desktop Chrome, or Safari / Chrome on your phone through the https link.</div>
   </div>
@@ -144,7 +148,7 @@ $('musicBtn').onclick = async () => {
     const src = audioCtx.createMediaStreamSource(micStream);
     analyser = audioCtx.createAnalyser(); analyser.fftSize = 1024; analyser.smoothingTimeConstant = 0.2;
     src.connect(analyser); freq = new Uint8Array(analyser.frequencyBinCount); $('musicBtn').classList.add('on');
-  } catch (e) { console.error(e); $('musicBtn').textContent = '🎵 Mic blocked'; }
+  } catch (e) { console.error(e); $('musicBtn').textContent = 'Mic blocked'; }
 };
 function updateBeat(now) {
   beat *= 0.9; if (!analyser) return;
@@ -156,21 +160,22 @@ function updateBeat(now) {
 
 /* ---------- Particles: confetti, sparkles, smoke ---------- */
 const parts = [];
-const CONF = ['#ff7eb6', '#ffd166', '#7ad7ff', '#b28dff', '#9ef0c0', '#ffffff'];
+const CONF = ['#ffffff', '#e6eefc', '#d7e8ff', '#f3dbe9', '#e3dcff', '#cfd8e6'];   // silver / pearl tones
 function confetti(x, y, n, power = 1) {
   for (let i = 0; i < n && parts.length < 700; i++) {
-    const a = rand(-Math.PI, 0), s = rand(3, 9) * power;
-    parts.push({ k: 'c', x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, r: rand(4, 8), rot: rand(0, 6.28), vr: rand(-0.3, 0.3), col: pick(CONF), life: 1, d: rand(0.006, 0.012) });
+    const a = rand(-Math.PI, 0), s = rand(2, 7) * power;
+    parts.push({ k: 'c', x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, r: rand(2, 4.5), rot: rand(0, 6.28), vr: rand(-0.3, 0.3), col: pick(CONF), life: 1, d: rand(0.006, 0.012) });
   }
 }
-function sparkle(x, y, n, spread = 20) { for (let i = 0; i < n && parts.length < 700; i++) parts.push({ k: 's', x: x + rand(-spread, spread), y: y + rand(-spread, spread), vx: rand(-.5, .5), vy: rand(-1.2, 0), r: rand(1.5, 3.5), life: 1, d: rand(.02, .04), col: pick(['#fff', '#ffe9a8', '#ffd1e8']) }); }
+function sparkle(x, y, n, spread = 20) { for (let i = 0; i < n && parts.length < 700; i++) parts.push({ k: 's', x: x + rand(-spread, spread), y: y + rand(-spread, spread), vx: rand(-.5, .5), vy: rand(-1.2, 0), r: rand(1.5, 3.5), life: 1, d: rand(.02, .04), col: pick(['#ffffff', '#d9ecff', '#f1e6ff']) }); }
 function smoke(x, y) { for (let i = 0; i < 6; i++) parts.push({ k: 'm', x: x + rand(-3, 3), y, vx: rand(-.3, .3), vy: rand(-1.4, -.6), r: rand(4, 8), life: 1, d: rand(.008, .014), ph: rand(0, 6) }); }
 function stepParts(dt) {
   const f = dt * 60;
   for (const p of parts) {
     p.life -= p.d * f;
-    if (p.k === 'c') { p.vy += 0.18 * f; p.vx *= 0.99; p.x += p.vx * f; p.y += p.vy * f; p.rot += p.vr * f; }
+    if (p.k === 'c') { p.vy += 0.07 * f; p.vx *= 0.985; p.x += p.vx * f; p.y += p.vy * f; p.rot += p.vr * f; }
     else if (p.k === 't') { p.y += p.vy * f; }
+    else if (p.k === 'u') { p.ph += 0.06 * f; p.x += (p.vx + Math.sin(p.ph) * 0.3) * f; p.y += p.vy * f; }
     else if (p.k === 'h') { p.vy += 0.08 * f; p.x += p.vx * f; p.y += p.vy * f; }
     else if (p.k === 'm') { p.ph += 0.05 * f; p.x += (p.vx + Math.sin(p.ph) * 0.4) * f; p.y += p.vy * f; p.r += 0.15 * f; }
     else { p.x += p.vx * f; p.y += p.vy * f; }
@@ -180,8 +185,9 @@ function stepParts(dt) {
 function drawParts() {
   for (const p of parts) {
     ctx.save(); ctx.globalAlpha = clamp(p.life * 1.5, 0, 1);
-    if (p.k === 'c') { ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.fillStyle = p.col; ctx.fillRect(-p.r / 2, -p.r / 4, p.r, p.r / 2); }
-    else if (p.k === 't') { ctx.font = `800 ${p.size}px "Baloo 2", sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineWidth = p.size * 0.16; ctx.strokeStyle = '#ff7eb6'; ctx.strokeText(p.text, p.x, p.y); ctx.fillStyle = '#fff'; ctx.fillText(p.text, p.x, p.y); }
+    if (p.k === 'c') { ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.fillStyle = p.col; ctx.globalAlpha *= 0.5 + 0.5 * Math.abs(Math.sin(p.rot * 2)); ctx.fillRect(-p.r / 2, -p.r / 2, p.r, p.r); }
+    else if (p.k === 'u') { ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = `rgba(255,236,200,${0.9 * p.life})`; ctx.shadowColor = '#ffd9a0'; ctx.shadowBlur = 6; ctx.fillRect(p.x, p.y, p.r, p.r); }
+    else if (p.k === 't') { ctx.font = `italic 400 ${p.size}px "Instrument Serif", serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineWidth = p.size * 0.16; ctx.strokeStyle = "rgba(150,200,255,0.5)"; ctx.strokeText(p.text, p.x, p.y); ctx.fillStyle = '#fff'; ctx.fillText(p.text, p.x, p.y); }
     else if (p.k === 'h') { const s2 = p.r; ctx.translate(p.x, p.y); ctx.fillStyle = '#ff6fae'; ctx.beginPath(); ctx.moveTo(0, s2 * .35); ctx.bezierCurveTo(-s2 * 1.1, -s2 * .35, -s2 * .55, -s2 * 1.1, 0, -s2 * .5); ctx.bezierCurveTo(s2 * .55, -s2 * 1.1, s2 * 1.1, -s2 * .35, 0, s2 * .35); ctx.fill(); }
     else if (p.k === 'm') { ctx.globalAlpha *= 0.35; ctx.fillStyle = '#f3f3f6'; ctx.filter = 'blur(3px)'; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill(); }
     else { ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = p.col; ctx.shadowColor = p.col; ctx.shadowBlur = 8; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill(); }
@@ -270,19 +276,20 @@ function updateButterflies(hands, now, dt) {
   for (const [slot, home] of homes) {
     if (!flies.some(f => f.slot === slot && !f.free) && now > nextFlyAt) {
       flies.push({ slot, x: home.pc.x, y: home.pc.y, vx: 0, vy: 0, ph: rand(0, 6.28), col: FLY_COLS[slot % FLY_COLS.length], s: 0, free: false, born: now, life: 1 });
-      nextFlyAt = now + 90; sparkle(home.pc.x, home.pc.y, 6, home.s * 0.3);
+      nextFlyAt = now + 110;
     }
   }
-  if (homes.size) say('🦋 Butterflies on your fingertips');
+  if (homes.size) say('Butterflies');
   const f = dt * 60;
   for (const b of flies) {
     const home = !b.free && homes.get(b.slot);
     if (!b.free && !home) { b.free = true; b.vx = rand(-1.5, 1.5); b.vy = rand(-3.5, -2); }     // hand closed → fly away
-    b.ph += (0.35 + beat * 0.5) * f;
+    b.ph += (0.22 + beat * 0.4) * f;
+    if (Math.random() < 0.08) parts.push({ k: 's', x: b.x, y: b.y, vx: rand(-.2, .2), vy: rand(-.4, .2), r: rand(0.8, 1.6), life: 1, d: 0.03, col: '#d9ecff' });
     if (home) {
       const hx = home.x + Math.sin(now / 400 + b.slot) * home.s * 0.06, hy = home.y + Math.cos(now / 330 + b.slot) * home.s * 0.05;
       b.x = lerp(b.x, hx, ease(dt, 6)); b.y = lerp(b.y, hy, ease(dt, 6));
-      b.s = lerp(b.s, home.s * 0.42, ease(dt, 5));
+      b.s = lerp(b.s, home.s * 0.2, ease(dt, 5));
       b.ang = lerp(b.ang || 0, Math.sin(now / 600 + b.slot) * 0.25, 0.1);
     } else {
       b.vx += rand(-0.15, 0.15) * f; b.vy -= 0.02 * f; b.x += b.vx * f; b.y += b.vy * f; b.life -= 0.006 * f;
@@ -295,21 +302,23 @@ function updateButterflies(hands, now, dt) {
 function drawButterflies() {
   for (const b of flies) {
     const s = b.s; if (s < 2) continue;
-    const flap = 0.25 + 0.75 * Math.abs(Math.cos(b.ph));
+    const flap = 0.2 + 0.8 * Math.abs(Math.cos(b.ph)), hue = 200 + (b.slot % 5) * 18;
     ctx.save(); ctx.globalAlpha = clamp(b.life * 1.5, 0, 1); ctx.translate(b.x, b.y); ctx.rotate(b.ang || 0);
-    ctx.shadowColor = b.col[1]; ctx.shadowBlur = 14;
     for (const side of [-1, 1]) {
       ctx.save(); ctx.scale(side * flap, 1);
-      const g = ctx.createRadialGradient(s * 0.15, -s * 0.2, 0, s * 0.4, -s * 0.2, s * 0.75);
-      g.addColorStop(0, '#ffffff'); g.addColorStop(0.45, b.col[0]); g.addColorStop(1, b.col[1]);
-      ctx.fillStyle = g;
-      ctx.beginPath(); ctx.moveTo(0, -s * 0.05); ctx.bezierCurveTo(s * 0.35, -s * 0.9, s * 1.05, -s * 0.75, s * 0.75, -s * 0.12); ctx.bezierCurveTo(s * 0.6, s * 0.05, s * 0.2, s * 0.05, 0, 0); ctx.fill();   // upper wing
-      ctx.beginPath(); ctx.moveTo(0, s * 0.02); ctx.bezierCurveTo(s * 0.55, s * 0.05, s * 0.7, s * 0.55, s * 0.32, s * 0.6); ctx.bezierCurveTo(s * 0.12, s * 0.6, s * 0.05, s * 0.3, 0, s * 0.05); ctx.fill();    // lower wing
-      ctx.shadowBlur = 0; ctx.fillStyle = 'rgba(255,255,255,0.75)'; ctx.beginPath(); ctx.arc(s * 0.55, -s * 0.42, s * 0.08, 0, Math.PI * 2); ctx.fill();
+      const up = () => { ctx.beginPath(); ctx.moveTo(0, -s * 0.05); ctx.bezierCurveTo(s * 0.3, -s * 0.95, s * 1.1, -s * 0.85, s * 0.8, -s * 0.1); ctx.bezierCurveTo(s * 0.62, s * 0.06, s * 0.2, s * 0.04, 0, 0); };
+      const lo = () => { ctx.beginPath(); ctx.moveTo(0, s * 0.02); ctx.bezierCurveTo(s * 0.55, s * 0.04, s * 0.72, s * 0.6, s * 0.32, s * 0.64); ctx.bezierCurveTo(s * 0.12, s * 0.64, s * 0.04, s * 0.3, 0, s * 0.05); };
+      const g = ctx.createLinearGradient(0, -s, s, s);
+      g.addColorStop(0, `hsla(${hue},80%,92%,0.32)`); g.addColorStop(1, `hsla(${hue + 40},70%,80%,0.08)`);
+      ctx.fillStyle = g; up(); ctx.fill(); lo(); ctx.fill();
+      ctx.strokeStyle = `hsla(${hue},90%,94%,0.95)`; ctx.lineWidth = 0.9; ctx.shadowColor = `hsla(${hue},100%,80%,0.9)`; ctx.shadowBlur = 8;
+      up(); ctx.stroke(); lo(); ctx.stroke();
+      ctx.shadowBlur = 0; ctx.lineWidth = 0.5; ctx.strokeStyle = `hsla(${hue},90%,94%,0.55)`;      // veins
+      ctx.beginPath(); for (const [x2, y2] of [[s * 0.75, -s * 0.55], [s * 0.85, -s * 0.2], [s * 0.4, -s * 0.75], [s * 0.45, s * 0.5]]) { ctx.moveTo(0, 0); ctx.quadraticCurveTo(x2 * 0.5, y2 * 0.3, x2, y2); } ctx.stroke();
       ctx.restore();
     }
-    ctx.shadowBlur = 0; ctx.fillStyle = '#5b3a5e'; ctx.beginPath(); ctx.ellipse(0, s * 0.1, s * 0.06, s * 0.38, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = '#5b3a5e'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(0, -s * 0.25); ctx.quadraticCurveTo(-s * 0.12, -s * 0.5, -s * 0.2, -s * 0.55); ctx.moveTo(0, -s * 0.25); ctx.quadraticCurveTo(s * 0.12, -s * 0.5, s * 0.2, -s * 0.55); ctx.stroke();
+    ctx.strokeStyle = 'rgba(235,245,255,0.95)'; ctx.lineWidth = 1.1; ctx.beginPath(); ctx.moveTo(0, -s * 0.2); ctx.lineTo(0, s * 0.45); ctx.stroke();
+    ctx.lineWidth = 0.6; ctx.beginPath(); ctx.moveTo(0, -s * 0.2); ctx.quadraticCurveTo(-s * 0.1, -s * 0.45, -s * 0.18, -s * 0.5); ctx.moveTo(0, -s * 0.2); ctx.quadraticCurveTo(s * 0.1, -s * 0.45, s * 0.18, -s * 0.5); ctx.stroke();
     ctx.restore();
   }
 }
@@ -345,7 +354,7 @@ function updateFloaters(hands, now, dt) {
       lastTip[tp.key] = { x: tp.x, y: tp.y, t: now };
     }
   }
-  if (tips.length) say('☝️ Bubbles! Poke them to pop');
+  if (tips.length) say('Bubbles — poke to pop');
   const f = dt * 60;
   for (const b of floaters) {
     if (b.popping) { b.popping += dt * 4; continue; }
@@ -383,12 +392,12 @@ function drawFloaters() {
     g.addColorStop(0, 'rgba(255,255,255,0.25)'); g.addColorStop(0.65, 'rgba(255,255,255,0.03)'); g.addColorStop(0.88, `hsla(${(hue + 180) % 360},90%,85%,0.25)`); g.addColorStop(1, `hsla(${hue},90%,80%,0.5)`);
     path(); ctx.fillStyle = g; ctx.fill();
     const rim = ctx.createLinearGradient(b.x - R, b.y - R, b.x + R, b.y + R);
-    rim.addColorStop(0, `hsla(${hue},95%,82%,0.95)`); rim.addColorStop(0.5, `hsla(${(hue + 120) % 360},95%,82%,0.95)`); rim.addColorStop(1, `hsla(${(hue + 240) % 360},95%,85%,0.95)`);
-    ctx.strokeStyle = rim; ctx.lineWidth = Math.max(1.2, R * 0.05); path(); ctx.stroke();
+    rim.addColorStop(0, `hsla(${hue},70%,88%,0.9)`); rim.addColorStop(0.5, `rgba(255,255,255,0.95)`); rim.addColorStop(1, `hsla(${(hue + 160) % 360},70%,88%,0.9)`);
+    ctx.strokeStyle = rim; ctx.globalAlpha *= 0.85; ctx.lineWidth = Math.max(0.8, R * 0.025); path(); ctx.stroke(); ctx.globalAlpha /= 0.85;
     if (b.type === 'emoji') { ctx.font = `${R * 1.05}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(b.emoji, b.x, b.y + R * 0.06); }
     if (b.type === 'word') {
-      let fs = R * 0.62; ctx.font = `800 ${fs}px "Baloo 2", sans-serif`;
-      const w = ctx.measureText(b.word).width; if (w > R * 1.6) { fs *= R * 1.6 / w; ctx.font = `800 ${fs}px "Baloo 2", sans-serif`; }
+      let fs = R * 0.62; ctx.font = `italic 400 ${fs}px "Instrument Serif", serif`;
+      const w = ctx.measureText(b.word).width; if (w > R * 1.6) { fs *= R * 1.6 / w; ctx.font = `italic 400 ${fs}px "Instrument Serif", serif`; }
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineWidth = fs * 0.18; ctx.strokeStyle = `hsla(${hue},80%,60%,0.9)`; ctx.strokeText(b.word, b.x, b.y);
       ctx.fillStyle = '#fff'; ctx.fillText(b.word, b.x, b.y);
     }
@@ -399,8 +408,8 @@ function drawFloaters() {
 
 /* ---------- 🖼 Finger frame ---------- */
 let frame = null, frameAmt = 0, frameIdx = -1, lastFrameAt = 0, frameStreak = 0;
-const FRAME_MODES = ['memory', 'snap', 'film'];     // each new frame switches to the next effect
-let frameMode = 'memory', memIdx = -1, frameSince = 0, snapped = false, flashAt = -1e9;
+const FRAME_MODES = ['snap', 'film', 'halftone'];     // each new frame switches to the next effect
+let frameMode = 'snap', memIdx = -1, frameSince = 0, snapped = false, flashAt = -1e9;
 const polaroids = [];
 const DATE_STAMP = (() => { const d = new Date(); return "'" + String(d.getFullYear()).slice(2) + ' ' + String(d.getMonth() + 1).padStart(2, ' ') + ' ' + String(d.getDate()).padStart(2, '0'); })();
 // draw the live (mirrored) camera so that it lines up with a screen rectangle
@@ -424,7 +433,7 @@ function drawPolaroids(now) {
     const x = lerp(p.x, p.tx, e), y = lerp(p.y, p.ty, e), r = lerp(0, p.rot, e);
     const iw = size, ih = size * (p.h / p.w > 1.3 ? 1.3 : p.h / p.w < 0.75 ? 0.75 : p.h / p.w), pad = iw * 0.07;
     ctx.save(); ctx.translate(x, y); ctx.rotate(r);
-    ctx.shadowColor = 'rgba(0,0,0,0.3)'; ctx.shadowBlur = 14; ctx.fillStyle = '#fffdf8';
+    ctx.shadowColor = 'rgba(0,0,0,0.45)'; ctx.shadowBlur = 20; ctx.fillStyle = '#f4f2ee';
     ctx.fillRect(-iw / 2 - pad, -ih / 2 - pad, iw + pad * 2, ih + pad * 4.2); ctx.shadowBlur = 0;
     const s = Math.max(iw / p.img.width, ih / p.img.height);
     ctx.save(); ctx.beginPath(); ctx.rect(-iw / 2, -ih / 2, iw, ih); ctx.clip();
@@ -432,8 +441,8 @@ function drawPolaroids(now) {
     const dev = clamp(1 - age / 2.2, 0, 1);                      // the photo "develops" from white
     if (dev > 0) { ctx.fillStyle = `rgba(250,248,240,${dev})`; ctx.fillRect(-iw / 2, -ih / 2, iw, ih); }
     ctx.restore();
-    ctx.fillStyle = '#e0568f'; ctx.font = `700 ${pad * 2.2}px "Dancing Script", cursive`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('22 ♡', 0, ih / 2 + pad * 1.6);
+    ctx.fillStyle = '#2a2f38'; ctx.font = `400 ${pad * 1.15}px "IBM Plex Mono", monospace`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText('22 — ' + DATE_STAMP.replace("'", '20').replace(/ /g, '.').replace('..', '.'), -iw / 2, ih / 2 + pad * 1.7);
     ctx.restore();
   }
   const fk = (now - flashAt) / 350;                            // shutter flash
@@ -458,31 +467,41 @@ function updateFrame(hands, now, dt) {
     frameAmt = lerp(frameAmt, 1, ease(dt, 8));
     if (frameMode === 'snap') {
       if (!snapped && now - frameSince > 800 && frameAmt > 0.85) { snapped = true; takeSnapshot(frame, now); }
-      say(snapped ? '📸 Snap! Frame again for the next effect' : '📸 Hold still…');
-    } else say(frameMode === 'film' ? '🎞 Film window' : '🖼 A memory in your frame');
+      say(snapped ? 'Captured — frame again for the next effect' : 'Hold still…');
+    } else say(frameMode === 'film' ? 'Film window' : 'Halftone');
   } else if (now - lastFrameAt > 250) frameAmt = lerp(frameAmt, 0, ease(dt, 6));
 }
+const halfC = document.createElement('canvas'), hcx = halfC.getContext('2d', { willReadFrequently: true });
 function drawFrame(now) {
   if (!frame || frameAmt < 0.02) return;
   const { x0, y0, x1, y1 } = frame, w = x1 - x0, h = y1 - y0, pad = Math.min(w, h) * 0.06;
   ctx.save(); ctx.globalAlpha = frameAmt;
-  if (frameMode === 'memory') {             // 🖼 a childhood photo inside a white frame
-    ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 18; ctx.fillStyle = '#fff'; ctx.fillRect(x0, y0, w, h); ctx.shadowBlur = 0;
-    ctx.save(); ctx.beginPath(); ctx.rect(x0 + pad, y0 + pad, w - pad * 2, h - pad * 2); ctx.clip();
-    const sc = 1 + (1 - frameAmt) * 0.15, n = photos.length || 1;
-    drawCover(photos[((memIdx % n) + n) % n], x0 + pad - (sc - 1) * w / 2, y0 + pad - (sc - 1) * h / 2, (w - pad * 2) * sc, (h - pad * 2) * sc);
-    ctx.restore();
+  if (frameMode === 'halftone') {           // ▦ black-and-white halftone print on the live camera
+    const step = Math.max(5, Math.round(Math.min(w, h) / 46)), gw = Math.max(1, Math.round(w / step)), gh = Math.max(1, Math.round(h / step));
+    if (halfC.width !== gw || halfC.height !== gh) { halfC.width = gw; halfC.height = gh; }
+    const c = cover(); hcx.save(); hcx.setTransform(1, 0, 0, 1, 0, 0); hcx.translate(gw, 0); hcx.scale(-1, 1);
+    hcx.drawImage(video, (c.ox - (W - x1)) * gw / w, (c.oy - y0) * gh / h, c.dw * gw / w, c.dh * gh / h); hcx.restore();
+    const d = hcx.getImageData(0, 0, gw, gh).data;
+    ctx.fillStyle = '#efece4'; ctx.fillRect(x0, y0, w, h); ctx.fillStyle = '#16181c';
+    for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) {
+      const k = (j * gw + i) * 4, lum = (d[k] * 0.3 + d[k + 1] * 0.59 + d[k + 2] * 0.11) / 255;
+      const r = step * 0.55 * Math.pow(1 - lum, 0.9); if (r < 0.35) continue;
+      ctx.beginPath(); ctx.arc(x0 + (i + 0.5) * step, y0 + (j + 0.5) * step, r, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1; ctx.strokeRect(x0, y0, w, h);
+    ctx.font = `400 ${Math.max(9, pad * 0.75)}px "IBM Plex Mono", monospace`; ctx.fillStyle = '#16181c'; ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillText('NO. 22', x0 + pad * 0.6, y0 + pad * 0.5);
   } else if (frameMode === 'snap') {        // 📸 camera viewfinder
     const L = Math.min(w, h) * 0.18;
-    ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.shadowColor = 'rgba(0,0,0,0.4)'; ctx.shadowBlur = 6;
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.shadowColor = 'rgba(0,0,0,0.4)'; ctx.shadowBlur = 4;
     for (const [cx, cy, sx, sy] of [[x0, y0, 1, 1], [x1, y0, -1, 1], [x0, y1, 1, -1], [x1, y1, -1, -1]]) { ctx.beginPath(); ctx.moveTo(cx, cy + sy * L); ctx.lineTo(cx, cy); ctx.lineTo(cx + sx * L, cy); ctx.stroke(); }
     ctx.shadowBlur = 0;
     if (!snapped) {
       const k = clamp((now - frameSince) / 800, 0, 1);         // little countdown ring
-      ctx.beginPath(); ctx.arc((x0 + x1) / 2, (y0 + y1) / 2, Math.min(w, h) * 0.08, -Math.PI / 2, -Math.PI / 2 + k * Math.PI * 2); ctx.lineWidth = 4; ctx.stroke();
+      ctx.beginPath(); ctx.arc((x0 + x1) / 2, (y0 + y1) / 2, Math.min(w, h) * 0.07, -Math.PI / 2, -Math.PI / 2 + k * Math.PI * 2); ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.beginPath(); ctx.moveTo((x0 + x1) / 2 - 8, (y0 + y1) / 2); ctx.lineTo((x0 + x1) / 2 + 8, (y0 + y1) / 2); ctx.moveTo((x0 + x1) / 2, (y0 + y1) / 2 - 8); ctx.lineTo((x0 + x1) / 2, (y0 + y1) / 2 + 8); ctx.lineWidth = 1; ctx.stroke();
     }
     ctx.fillStyle = (now / 500 | 0) % 2 ? '#ff4d6d' : 'rgba(255,77,109,0.3)'; ctx.beginPath(); ctx.arc(x0 + pad * 1.4, y0 + pad * 1.4, pad * 0.45, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.font = `700 ${pad * 0.9}px -apple-system, sans-serif`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText('REC', x0 + pad * 2.1, y0 + pad * 1.42);
+    ctx.fillStyle = '#fff'; ctx.font = `400 ${pad * 0.8}px "IBM Plex Mono", monospace`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText('REC  ISO 400  1/60', x0 + pad * 2.1, y0 + pad * 1.42);
   } else {                                  // 🎞 retro film window on the live camera
     ctx.save(); ctx.filter = 'sepia(0.55) saturate(1.35) contrast(1.08) brightness(1.05)'; drawLive(x0, y0, w, h); ctx.restore();
     ctx.save(); ctx.beginPath(); ctx.rect(x0, y0, w, h); ctx.clip();
@@ -501,95 +520,123 @@ function drawFrame(now) {
 
 /* ---------- ✌️✌️ 22 balloons + cake ---------- */
 const balloons = [];
-let peaceStreak = 0, lastPeaceFire = 0, cake = null;
+let peaceStreak = 0, lastPeaceFire = 0, cake = null, tetherHands = null;
 function updatePeace(hands, now) {
   const both = hands.length === 2 && hands[0].peace && hands[1].peace;
   peaceStreak = both ? peaceStreak + 1 : 0;
   if (both && peaceStreak >= 3 && now - lastPeaceFire > 2500) {
     lastPeaceFire = now;
     const [a, b] = [...hands].sort((u, v) => u.p[0].x - v.p[0].x);
-    for (const h of [a, b]) balloons.push({ x: (h.p[8].x + h.p[12].x) / 2, y: h.p[0].y, vy: -1.2, sx: h.p[0].x, sy: h.p[0].y, born: now, ph: rand(0, 6), col: h === a ? ['#ffb3d1', '#ff6fa8'] : ['#b9a3ff', '#8a63ff'] });
+    for (const h of [a, b]) balloons.push({ x: (h.p[8].x + h.p[12].x) / 2, y: h.p[0].y, vy: -1.2, sx: (h.p[8].x + h.p[12].x) / 2, sy: Math.min(h.p[8].y, h.p[12].y), hand: h === a ? 0 : 1, born: now, ph: rand(0, 6) });
+    tetherHands = [a, b];
     if (!cake || cake.state === 'out') cake = { state: 'lit', born: now, outAt: 0 };
-    confetti(W / 2, H * 0.6, 40, 0.8); say('✌️✌️ Twenty-two!');
+    sparkle(W / 2, H * 0.55, 30, W * 0.15); say('Twenty-two');
   }
 }
 function stepBalloons(dt, now) {
   const f = dt * 60;
-  for (const b of balloons) { const age = (now - b.born) / 1000; b.vy = age < 7 ? lerp(b.vy, -0.9 - beat * 0.8, 0.05) : -2.5; b.y += b.vy * f; b.ph += 0.03 * f; b.x += Math.sin(b.ph) * 0.4 * f; if (b.y < H * 0.22 && age < 7) b.y = H * 0.22 + Math.sin(b.ph) * 6; }
+  for (const b of balloons) { const age = (now - b.born) / 1000; b.vy = age < 7 ? lerp(b.vy, -0.9 - beat * 0.8, 0.05) : -2.5; b.y += b.vy * f; b.ph += 0.03 * f; b.x += Math.sin(b.ph) * 0.4 * f; if (b.y < H * 0.36 && age < 7) b.y = H * 0.36 + Math.sin(b.ph) * 6; /* rest below the title line */ }
   for (let i = balloons.length - 1; i >= 0; i--) if (balloons[i].y < -200) balloons.splice(i, 1);
 }
 function drawBalloons(now) {
+  // "2" and "2" as thin glowing outlines with a glitchy RGB split, tethered to your hands by a line of light
   for (const b of balloons) {
-    const s = Math.min(W, H) * 0.16 * (1 + beat * 0.05), bx = b.x, by = b.y;
-    // string
-    ctx.save(); ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(bx, by + s * 0.55);
-    ctx.bezierCurveTo(bx + 12, by + s, bx - 12, by + s * 1.4, bx + Math.sin(b.ph) * 8, by + s * 1.9); ctx.stroke(); ctx.restore();
-    // foil number "2"
-    ctx.save(); ctx.translate(bx, by); ctx.rotate(Math.sin(b.ph) * 0.08);
-    ctx.font = `800 ${s * 1.25}px "Baloo 2", "Arial Rounded MT Bold", sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    const g = ctx.createLinearGradient(-s / 2, -s / 2, s / 2, s / 2); g.addColorStop(0, b.col[0]); g.addColorStop(0.5, '#ffffff'); g.addColorStop(1, b.col[1]);
-    ctx.lineJoin = 'round'; ctx.lineWidth = s * 0.08; ctx.strokeStyle = b.col[1]; ctx.strokeText('2', 0, 0);
-    ctx.fillStyle = g; ctx.shadowColor = 'rgba(0,0,0,0.25)'; ctx.shadowBlur = 12; ctx.fillText('2', 0, 0);
-    ctx.shadowBlur = 0; ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.beginPath(); ctx.ellipse(-s * 0.18, -s * 0.28, s * 0.07, s * 0.16, -0.5, 0, Math.PI * 2); ctx.fill();
+    const s = Math.min(W, H) * 0.2 * (1 + beat * 0.04), bx = b.x, by = b.y, age = (now - b.born) / 1000;
+    ctx.save();
+    const tg = ctx.createLinearGradient(bx, by + s * 0.5, b.sx || bx, b.sy || by + s * 2);
+    tg.addColorStop(0, 'rgba(220,240,255,0.7)'); tg.addColorStop(1, 'rgba(220,240,255,0)');
+    ctx.strokeStyle = tg; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(bx, by + s * 0.5); ctx.lineTo(b.sx || bx, b.sy || by + s * 2); ctx.stroke();
+    ctx.translate(bx, by); ctx.rotate(Math.sin(b.ph) * 0.04);
+    ctx.font = `400 ${s * 1.3}px "Instrument Serif", serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const glitch = (Math.random() < 0.06 || beat > 0.7) ? rand(2, 6) : 1.2;
+    ctx.globalCompositeOperation = 'lighter'; ctx.lineWidth = 1.2;
+    ctx.strokeStyle = 'rgba(255,60,90,0.55)'; ctx.strokeText('2', -glitch, 0);
+    ctx.strokeStyle = 'rgba(60,200,255,0.55)'; ctx.strokeText('2', glitch, 0);
+    ctx.strokeStyle = 'rgba(245,250,255,0.95)'; ctx.shadowColor = '#bfe3ff'; ctx.shadowBlur = 16; ctx.strokeText('2', 0, 0);
+    // scanline fill
+    ctx.save(); ctx.globalAlpha = 0.18; ctx.fillStyle = '#dff1ff'; ctx.shadowBlur = 0; ctx.fillText('2', 0, 0); ctx.restore();
     ctx.restore();
+    if (age < 0.6) sparkle(bx, by, 2, s * 0.5);
   }
 }
 function drawCake(now, t) {
   if (!cake) return;
-  const age = (now - cake.born) / 1000, inA = clamp(age / 0.8, 0, 1);
-  if (cake.state === 'out' && now - cake.outAt > 6000) { cake = null; return; }
-  const cw = Math.min(W * 0.32, 360), ch = cw * 0.55, cx = W / 2, by = H - 8 + (1 - inA) * ch * 1.5;
-  ctx.save();
-  // plate
-  ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.beginPath(); ctx.ellipse(cx, by, cw * 0.62, ch * 0.12, 0, 0, Math.PI * 2); ctx.fill();
-  // bottom tier
-  const t1 = { w: cw, h: ch * 0.5, y: by - ch * 0.5 };
-  const tier = (w, h, y, c1, c2) => {
-    const g = ctx.createLinearGradient(0, y, 0, y + h); g.addColorStop(0, c1); g.addColorStop(1, c2);
-    ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(cx - w / 2, y, w, h, 14) : ctx.rect(cx - w / 2, y, w, h); ctx.fill();
-    ctx.fillStyle = '#fff7fb'; ctx.beginPath(); ctx.moveTo(cx - w / 2, y + 6);
-    for (let i = 0; i <= 10; i++) { const x = cx - w / 2 + w * i / 10; ctx.quadraticCurveTo(x - w / 40, y + h * 0.32, x, y + 6); }
-    ctx.lineTo(cx + w / 2, y); ctx.lineTo(cx - w / 2, y); ctx.fill();
-    for (let i = 0; i < 9; i++) { ctx.fillStyle = CONF[i % 5]; ctx.beginPath(); ctx.arc(cx - w / 2 + w * (i + 0.5) / 9, y + h * 0.7, 3, 0, Math.PI * 2); ctx.fill(); }
+  const age = (now - cake.born) / 1000, inA = clamp(age / 1.0, 0, 1);
+  if (cake.state === 'out' && now - cake.outAt > 7000) { cake = null; return; }
+  const cw = Math.min(W * 0.3, 340), cx = W / 2, base = H - 18 + (1 - inA) * 80;
+  const rot = t * 0.6, tilt = 0.28;
+  ctx.save(); ctx.globalAlpha = inA; ctx.lineCap = 'round';
+  const line = (a) => `rgba(200,232,255,${a})`;
+  // rotating HUD ring on the "plate"
+  ctx.strokeStyle = line(0.5); ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.ellipse(cx, base, cw * 0.66, cw * 0.66 * tilt, 0, 0, Math.PI * 2); ctx.stroke();
+  for (let i = 0; i < 48; i++) { const a = i / 48 * Math.PI * 2 + rot * 0.5, r1 = cw * 0.66, r2 = r1 * (i % 4 ? 0.96 : 0.92);
+    ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * r1, base + Math.sin(a) * r1 * tilt); ctx.lineTo(cx + Math.cos(a) * r2, base + Math.sin(a) * r2 * tilt); ctx.stroke(); }
+  // wireframe tiers (cylinders)
+  const tier = (r, y, h) => {
+    const rr = r * tilt, g = ctx.createLinearGradient(0, y - h, 0, y);
+    g.addColorStop(0, 'rgba(170,215,255,0.10)'); g.addColorStop(1, 'rgba(170,215,255,0.02)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(cx, y, r, rr, 0, 0, Math.PI); ctx.lineTo(cx - r, y - h); ctx.ellipse(cx, y - h, r, rr, 0, Math.PI, 0, true); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = line(0.85); ctx.lineWidth = 1; ctx.shadowColor = '#9fd2ff'; ctx.shadowBlur = 6;
+    ctx.beginPath(); ctx.ellipse(cx, y - h, r, rr, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(cx, y, r, rr, 0, 0, Math.PI); ctx.stroke();
+    ctx.shadowBlur = 0;
+    for (let i = 0; i < 16; i++) {               // vertical lines rotating around the cylinder
+      const a = i / 16 * Math.PI * 2 + rot, front = Math.sin(a) > 0;
+      ctx.strokeStyle = line(front ? 0.6 : 0.15);
+      const x = cx + Math.cos(a) * r, yo = Math.sin(a) * rr;
+      ctx.beginPath(); ctx.moveTo(x, y + yo); ctx.lineTo(x, y - h + yo); ctx.stroke();
+    }
+    ctx.strokeStyle = line(0.25); ctx.beginPath(); ctx.ellipse(cx, y - h * 0.5, r, rr, 0, 0, Math.PI); ctx.stroke();
   };
-  tier(t1.w, t1.h, t1.y, '#ffc6dd', '#ff9fc6');
-  const t2 = { w: cw * 0.66, h: ch * 0.38, y: t1.y - ch * 0.38 };
-  tier(t2.w, t2.h, t2.y, '#fff0f6', '#ffd3e6');
-  // number candles "2" "2"
+  const r1 = cw * 0.5, h1 = cw * 0.24, r2 = cw * 0.34, h2 = cw * 0.2;
+  tier(r1, base - 4, h1); tier(r2, base - 4 - h1, h2);
+  const top = base - 4 - h1 - h2;
+  // "22" candles as light bars + flames as glowing orbs
   const lit = cake.state === 'lit';
-  for (const [i, dx] of [[0, -0.12], [1, 0.12]]) {
-    const x = cx + cw * dx, y = t2.y, s = ch * 0.55;
-    ctx.font = `800 ${s}px "Baloo 2", sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-    ctx.lineWidth = 4; ctx.strokeStyle = '#ffffff'; ctx.strokeText('2', x, y + s * 0.12);
-    ctx.fillStyle = i ? '#a97bff' : '#ff6fa8'; ctx.fillText('2', x, y + s * 0.12);
-    const wy = y - s * 0.72;
-    ctx.strokeStyle = '#555'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x, wy); ctx.lineTo(x, wy - 8); ctx.stroke();
+  for (const [i, dx] of [[0, -0.09], [1, 0.09]]) {
+    const x = cx + cw * dx, y = top, hgt = cw * 0.2;
+    ctx.strokeStyle = line(0.9); ctx.lineWidth = 1; ctx.strokeRect(x - 3, y - hgt, 6, hgt);
+    ctx.font = `400 ${cw * 0.09}px "IBM Plex Mono", monospace`; ctx.fillStyle = line(0.8); ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText('2', x, y - hgt * 0.8);
+    const fy = y - hgt - 12;
     if (lit) {
-      const fl = 1 + Math.sin(t * 18 + i) * 0.08 + beat * 0.25, fx = x + Math.sin(t * 7 + i) * 1.5;
-      const g = ctx.createRadialGradient(fx, wy - 18, 1, fx, wy - 18, 40 * fl);
-      g.addColorStop(0, 'rgba(255,230,150,0.6)'); g.addColorStop(1, 'rgba(255,200,120,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(fx, wy - 18, 40 * fl, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#ffb020'; ctx.beginPath(); ctx.moveTo(fx, wy - 30 * fl); ctx.quadraticCurveTo(fx + 9, wy - 12, fx, wy - 6); ctx.quadraticCurveTo(fx - 9, wy - 12, fx, wy - 30 * fl); ctx.fill();
-      ctx.fillStyle = '#fff4c2'; ctx.beginPath(); ctx.moveTo(fx, wy - 20 * fl); ctx.quadraticCurveTo(fx + 4, wy - 11, fx, wy - 8); ctx.quadraticCurveTo(fx - 4, wy - 11, fx, wy - 20 * fl); ctx.fill();
-    } else if (now - cake.outAt < 2500 && Math.random() < 0.3) smoke(x, wy - 8);
-    if (i === 0) cake.wick = [{ x, y: wy }]; else cake.wick.push({ x, y: wy });
+      const fl = 1 + Math.sin(t * 17 + i * 2) * 0.1 + beat * 0.35;
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      const g = ctx.createRadialGradient(x, fy, 0, x, fy, 34 * fl); g.addColorStop(0, 'rgba(255,240,215,0.95)'); g.addColorStop(0.25, 'rgba(255,214,160,0.45)'); g.addColorStop(1, 'rgba(255,200,140,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, fy, 34 * fl, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fffaf0'; ctx.beginPath(); ctx.ellipse(x, fy, 2.6, 6 * fl, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+      if (Math.random() < 0.25) parts.push({ k: 'u', x: x + rand(-2, 2), y: fy - 6, vx: 0, vy: rand(-1, -0.4), r: rand(0.8, 1.6), life: 1, d: 0.03, ph: rand(0, 6) });
+    } else if (now - cake.outAt < 3000 && Math.random() < 0.5) parts.push({ k: 'u', x: x + rand(-3, 3), y: fy, vx: rand(-0.2, 0.2), vy: rand(-1.6, -0.6), r: rand(0.8, 2), life: 1, d: rand(0.008, 0.015), ph: rand(0, 6) });
+    if (i === 0) cake.wick = [{ x, y: fy }]; else cake.wick.push({ x, y: fy });
   }
+  // HUD label
+  ctx.font = `400 10px "IBM Plex Mono", monospace`; ctx.fillStyle = line(0.6); ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  ctx.fillText(lit ? 'CANDLES  ·  02 / LIT' : 'CANDLES  ·  00 / OUT', cx + cw * 0.7, base - 6);
   ctx.restore();
 }
 
 /* ---------- 😌 Wish + 🌬 blow ---------- */
 let eyesClosed = false, eyesClosedSince = 0, eyesOpenSince = 0, wishAmt = 0, mouthOpen = 0, blowSince = 0, mouthBase = 0.06;
 const stars = Array.from({ length: 90 }, () => ({ x: rand(0, 1), y: rand(0, 1), tx: 0, ty: 0, tw: rand(0, 6) }));
+const cons = Array.from({ length: 46 }, () => ({ x: rand(0.06, 0.94), y: rand(0.06, 0.62), tw: rand(0, 6) }));
+const consLinks = []; cons.forEach((a, i) => { const near = cons.map((b, j) => [j, Math.hypot(a.x - b.x, a.y - b.y)]).filter(([j]) => j !== i).sort((u, v) => u[1] - v[1]).slice(0, 2); near.forEach(([j, d]) => { if (d < 0.18 && i < j) consLinks.push([i, j]); }); });
 function drawWish(t) {
   if (wishAmt < 0.02) return;
   ctx.save();
-  ctx.fillStyle = `rgba(30,10,45,${0.45 * wishAmt})`; ctx.fillRect(0, 0, W, H);
-  const fs = Math.min(W * 0.085, 92), y1 = H * 0.3, y2 = y1 + fs * 1.1;
-  ctx.globalAlpha = wishAmt;
-  for (const s of stars) { const a = 0.4 + 0.6 * Math.abs(Math.sin(t * 2 + s.tw)); ctx.fillStyle = `rgba(255,245,210,${a})`; ctx.beginPath(); ctx.arc(s.x * W, s.y * H * 0.7, 1.4 + a, 0, Math.PI * 2); ctx.fill(); }
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.font = `700 ${fs}px "Dancing Script", cursive`; ctx.fillStyle = '#fff6e0'; ctx.shadowColor = '#ffc6e6'; ctx.shadowBlur = 24;
-  ctx.fillText($('wish1').value, W / 2, y1);
-  ctx.font = `600 ${fs * 0.62}px "Dancing Script", cursive`; ctx.fillText($('wish2').value + ' ✨', W / 2, y2);
+  ctx.fillStyle = `rgba(4,7,14,${0.62 * wishAmt})`; ctx.fillRect(0, 0, W, H);
+  // constellation
+  ctx.globalAlpha = wishAmt; ctx.strokeStyle = 'rgba(200,225,255,0.28)'; ctx.lineWidth = 0.6;
+  ctx.beginPath(); for (const [i, j] of consLinks) { const k = clamp(wishAmt * 1.4 - (i % 7) * 0.05, 0, 1); const a = cons[i], b = cons[j];
+    ctx.moveTo(a.x * W, a.y * H); ctx.lineTo(lerp(a.x, b.x, k) * W, lerp(a.y, b.y, k) * H); } ctx.stroke();
+  for (const c of cons) { const a = 0.35 + 0.65 * Math.abs(Math.sin(t * 1.6 + c.tw)); ctx.fillStyle = `rgba(235,244,255,${a})`; ctx.beginPath(); ctx.arc(c.x * W, c.y * H, 0.8 + a * 1.2, 0, Math.PI * 2); ctx.fill(); }
+  // wish text, revealed letter by letter
+  const w1 = $('wish1').value, w2 = $('wish2').value, n = Math.round(clamp(wishAmt, 0, 1) * (w1.length + w2.length));
+  const fs = Math.min(W * 0.09, 104), y1 = H * 0.36;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#f2f6fb'; ctx.shadowColor = 'rgba(180,215,255,0.7)'; ctx.shadowBlur = 20;
+  ctx.font = `italic 400 ${fs}px "Instrument Serif", serif`; ctx.fillText(w1.slice(0, n), W / 2, y1);
+  ctx.shadowBlur = 0; ctx.font = `400 ${Math.max(11, fs * 0.16)}px "IBM Plex Mono", monospace`; ctx.fillStyle = 'rgba(220,235,255,0.85)';
+  ctx.fillText(w2.slice(0, Math.max(0, n - w1.length)).toUpperCase().split('').join(' '), W / 2, y1 + fs * 0.85);
+  ctx.font = `400 10px "IBM Plex Mono", monospace`; ctx.fillStyle = 'rgba(220,235,255,0.45)'; ctx.fillText('— MAKE A WISH —', W / 2, y1 - fs * 0.85);
   ctx.restore();
 }
 
@@ -632,6 +679,24 @@ function onBeat() {
   if (balloons.length) sparkle(rand(0, W), rand(0, H * 0.5), 4, 30);
 }
 
+/* ---------- Tech overlays: hand wireframe + film grain ---------- */
+const BONES = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+function drawHandHUD() {
+  if (!hands.length) return;
+  ctx.save(); ctx.strokeStyle = 'rgba(225,238,255,0.38)'; ctx.lineWidth = 0.7;
+  for (const h of hands) {
+    ctx.beginPath(); for (const [a, b] of BONES) { ctx.moveTo(h.p[a].x, h.p[a].y); ctx.lineTo(h.p[b].x, h.p[b].y); } ctx.stroke();
+    ctx.fillStyle = 'rgba(240,247,255,0.9)'; for (const q of h.p) { ctx.fillRect(q.x - 1.2, q.y - 1.2, 2.4, 2.4); }
+    for (const i of [4, 8, 12, 16, 20]) { ctx.beginPath(); ctx.arc(h.p[i].x, h.p[i].y, 4, 0, Math.PI * 2); ctx.stroke(); }
+    const w = h.p[0]; ctx.font = '400 9px "IBM Plex Mono", monospace'; ctx.fillStyle = 'rgba(220,235,255,0.6)'; ctx.textAlign = 'left';
+    ctx.fillText(`${h.side.toUpperCase()}  ${h.open ? 'OPEN' : h.peace ? 'V' : h.point ? 'POINT' : h.ell ? 'FRAME' : '—'}`, w.x + 8, w.y + 14);
+  }
+  ctx.restore();
+}
+const grainC = document.createElement('canvas'); grainC.width = grainC.height = 160;
+(() => { const g = grainC.getContext('2d'), im = g.createImageData(160, 160); for (let i = 0; i < im.data.length; i += 4) { const v = Math.random() * 255; im.data[i] = im.data[i + 1] = im.data[i + 2] = v; im.data[i + 3] = 22; } g.putImageData(im, 0, 0); })();
+function drawGrain() { ctx.save(); ctx.globalCompositeOperation = 'overlay'; const ox = Math.random() * 160, oy = Math.random() * 160; ctx.translate(-ox, -oy); ctx.fillStyle = ctx.createPattern(grainC, 'repeat'); ctx.fillRect(0, 0, W + 160, H + 160); ctx.restore(); }
+
 /* ---------- Main loop ---------- */
 let lastT = performance.now();
 function loop() {
@@ -643,32 +708,39 @@ function loop() {
   let wantWish = eyesClosed ? now - eyesClosedSince > 400 : (now - eyesOpenSince < 2500 && wishAmt > 0.3);
   if (window.__forceWish) wantWish = true;
   wishAmt = lerp(wishAmt, wantWish ? 1 : 0, ease(dt, wantWish ? 3 : 1.2));
-  if (wishAmt > 0.5) say('😌 Make a wish…');
+  if (wishAmt > 0.5) say('Make a wish');
   // blow out the candles: mouth open / rounded for 0.3 s while the cake is lit
   if (cake && cake.state === 'lit' && (now - cake.born) > 1200) {
     if (mouthOpen > 0.55 || window.__forceBlow) { if (!blowSince) blowSince = now; } else blowSince = 0;
     if (blowSince && now - blowSince > 600) {   // a real blow is held; a quick "oh" while talking is not
       cake.state = 'out'; cake.outAt = now; blowSince = 0;
-      confetti(W * 0.3, H * 0.5, 80, 1.2); confetti(W * 0.7, H * 0.5, 80, 1.2); confetti(W / 2, H * 0.75, 60, 1.4);
-      say('🎉 Happy 22nd birthday!');
-    } else if (cake.state === 'lit') say('🌬 Round your lips and blow "hooo"!');
+      confetti(W * 0.5, H * 0.72, 90, 1.1); confetti(W * 0.25, H * 0.4, 50, 0.8); confetti(W * 0.75, H * 0.4, 50, 0.8);
+      say('Happy 22nd birthday');
+    } else if (cake.state === 'lit') say('Blow "hooo" to put out the candles');
   }
-  if (!hands.length && wishAmt < 0.3 && now - statusAt > 2600) say('🎂 Open your palm, make a frame, or show ✌️✌️');
+  if (!hands.length && wishAmt < 0.3 && now - statusAt > 2600) say('Ready — open palm · point · frame · ✌✌');
   stepBalloons(dt, now); stepParts(dt);
   $('beatDot').style.transform = `scale(${1 + beat * 1.2})`; $('beatDot').style.background = analyser ? `rgba(255,170,210,${0.5 + beat * 0.5})` : 'rgba(255,255,255,.35)';
 
   // camera (mirrored) with a soft birthday glow
-  ctx.fillStyle = '#1b1020'; ctx.fillRect(0, 0, W, H);
-  if (video.readyState >= 2) { const c = cover(); ctx.save(); ctx.translate(W, 0); ctx.scale(-1, 1); ctx.drawImage(video, c.ox, c.oy, c.dw, c.dh); ctx.restore(); }
-  const vg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.75);
-  vg.addColorStop(0, 'rgba(255,190,220,0)'); vg.addColorStop(1, `rgba(150,70,140,${0.35 + beat * 0.15})`); ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
-  ctx.save(); ctx.globalCompositeOperation = 'soft-light'; ctx.globalAlpha = 0.25; ctx.fillStyle = '#ffc3dc'; ctx.fillRect(0, 0, W, H); ctx.restore();
+  ctx.fillStyle = '#07090d'; ctx.fillRect(0, 0, W, H);
+  if (video.readyState >= 2) { const c = cover(); ctx.save(); ctx.filter = 'saturate(0.82) contrast(1.06) brightness(0.98)'; ctx.translate(W, 0); ctx.scale(-1, 1); ctx.drawImage(video, c.ox, c.oy, c.dw, c.dh); ctx.restore(); }
+  // cool cinematic grade + vignette
+  ctx.save(); ctx.globalCompositeOperation = 'soft-light'; ctx.globalAlpha = 0.35; ctx.fillStyle = '#2a4a6e'; ctx.fillRect(0, 0, W, H); ctx.restore();
+  const vg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.38, W / 2, H / 2, Math.max(W, H) * 0.78);
+  vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, `rgba(3,6,12,${0.55 - beat * 0.15})`); ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
+  drawHandHUD();
 
+  drawGrain();
+  if (beat > 0.6) { ctx.save(); ctx.fillStyle = `rgba(220,240,255,${0.06 * beat})`; const sy = (1 - beat) * H; ctx.fillRect(0, sy, W, 2); ctx.restore(); }
   drawWish(t); drawCake(now, t); drawBalloons(now); drawFrame(now); drawPolaroids(now); drawFloaters(); drawButterflies(); drawParts();
   if (cake && cake.state === 'out' && now - cake.outAt < 4000) {
-    const k = (now - cake.outAt) / 4000, fs = Math.min(W * 0.07, 76);
-    ctx.save(); ctx.globalAlpha = Math.min(1, (1 - k) * 2); ctx.textAlign = 'center'; ctx.font = `700 ${fs}px "Dancing Script", cursive`;
-    ctx.fillStyle = '#fff'; ctx.shadowColor = '#ff7eb6'; ctx.shadowBlur = 24; ctx.fillText('Happy 22nd Birthday', W / 2, H * 0.18); ctx.restore();
+    const k = (now - cake.outAt) / 4000, fs = Math.min(W * 0.075, 86);
+    ctx.save(); ctx.globalAlpha = Math.min(1, (1 - k) * 2, k * 6); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = `italic 400 ${fs}px "Instrument Serif", serif`; ctx.fillStyle = '#f4f8fc'; ctx.shadowColor = 'rgba(170,210,255,0.8)'; ctx.shadowBlur = 22;
+    ctx.fillText('Happy twenty-second', W / 2, H * 0.17);
+    ctx.shadowBlur = 0; ctx.font = `400 11px "IBM Plex Mono", monospace`; ctx.fillStyle = 'rgba(220,235,255,0.7)'; ctx.fillText('B I R T H D A Y   ·   ' + DATE_STAMP.replace("'", '20').trim().replace(/ +/g, '.'), W / 2, H * 0.17 + fs * 0.7);
+    ctx.restore();
   }
 }
 
@@ -682,8 +754,8 @@ $('recBtn').onclick = () => {
     const mime = ['video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm'].find(m => MediaRecorder.isTypeSupported(m)) || '';
     rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined); chunks = [];
     rec.ondataavailable = e => e.data.size && chunks.push(e.data);
-    rec.onstop = () => { const type = rec.mimeType || 'video/webm'; const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(chunks, { type })); a.download = 'twenty-two.' + (type.includes('mp4') ? 'mp4' : 'webm'); a.click(); $('recBtn').classList.remove('on'); $('recBtn').textContent = '⏺ Record'; };
-    rec.start(); $('recBtn').classList.add('on'); $('recBtn').textContent = '⏹ Stop & save';
+    rec.onstop = () => { const type = rec.mimeType || 'video/webm'; const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(chunks, { type })); a.download = 'twenty-two.' + (type.includes('mp4') ? 'mp4' : 'webm'); a.click(); $('recBtn').classList.remove('on'); $('recBtn').textContent = '● Rec'; };
+    rec.start(); $('recBtn').classList.add('on'); $('recBtn').textContent = '■ Stop';
   } catch (e) { console.error(e); $('recBtn').textContent = 'Recording not supported'; }
 };
 
@@ -696,8 +768,8 @@ $('startBtn').onclick = async () => {
     video.srcObject = stream; await video.play();
     $('setup').style.display = 'none'; say('Loading models…');
     if (!started) { started = true; requestAnimationFrame(loop); }
-    try { await Promise.race([Promise.all([document.fonts.load('700 40px "Dancing Script"'), document.fonts.load('800 40px "Baloo 2"')]), new Promise(r => setTimeout(r, 2500))]); } catch (e) { }
-    await loadModels(); say('🎂 Open your palm, make a frame, or show ✌️✌️');
+    try { await Promise.race([Promise.all([document.fonts.load('italic 400 40px "Instrument Serif"'), document.fonts.load('400 40px "Instrument Serif"'), document.fonts.load('400 12px "IBM Plex Mono"')]), new Promise(r => setTimeout(r, 2500))]); } catch (e) { }
+    await loadModels(); say('Ready — open palm · point · frame · ✌✌');
   } catch (e) {
     console.error(e); $('setup').style.display = 'flex'; btn.disabled = false; btn.textContent = 'Try again';
     $('err').textContent = 'Could not open the camera or load the models. Please allow camera access, check your internet connection, and use Chrome or Safari. (' + (e.message || e) + ')';
@@ -709,8 +781,8 @@ window.__tt = () => ({ hands: hands.length, open: hands.filter(h => h.open).leng
   bubbles: flies.filter(f => !f.free).length, flies: flies.length, point: hands.filter(h => h.point).length, floaters: floaters.length, frame: +frameAmt.toFixed(2), cake: cake ? cake.state : null, wish: +wishAmt.toFixed(2), eyesClosed, mouth: +mouthOpen.toFixed(2), photos: photos.length });
 window.__spawnAll = () => { ['photo','emoji','word','glitter','heart','plain'].forEach((type, i) => floaters.push({ x: W * (0.15 + i * 0.14), y: H * 0.45, vx: 0, vy: -0.05, R: Math.min(W, H) * 0.07, born: performance.now() - 1000, ph: i, type, photo: i, emoji: EMOJIS[i], word: wordList()[i % wordList().length], hue: i * 50, dots: Array.from({ length: 14 }, () => [rand(-0.7, 0.7), rand(-0.7, 0.7), rand(0, 6)]), popping: 0 })); };
 window.__popAll = () => { for (const b of floaters) if (!b.popping) { b.popping = 0.01; popEffect(b); } };
-window.__showFrame = (mode) => { frame = { x0: W * 0.55, y0: H * 0.25, x1: W * 0.85, y1: H * 0.65 }; frameAmt = 1; lastFrameAt = performance.now() + 6000; frameMode = mode || 'memory'; memIdx = 2; frameSince = performance.now(); snapped = false; };
-window.__spawnCake = () => { lastPeaceFire = 0; balloons.push({ x: W * 0.4, y: H * 0.6, vy: -1.2, born: performance.now(), ph: 0, col: ['#ffb3d1', '#ff6fa8'] }, { x: W * 0.6, y: H * 0.6, vy: -1.2, born: performance.now(), ph: 2, col: ['#b9a3ff', '#8a63ff'] }); cake = { state: 'lit', born: performance.now() - 1500, outAt: 0 }; };
+window.__showFrame = (mode) => { frame = { x0: W * 0.55, y0: H * 0.25, x1: W * 0.85, y1: H * 0.65 }; frameAmt = 1; lastFrameAt = performance.now() + 6000; frameMode = mode || 'snap'; memIdx = 2; frameSince = performance.now(); snapped = false; };
+window.__spawnCake = () => { lastPeaceFire = 0; balloons.push({ x: W * 0.4, y: H * 0.6, vy: -1.2, sx: W * 0.3, sy: H * 0.9, born: performance.now(), ph: 0 }, { x: W * 0.6, y: H * 0.6, vy: -1.2, sx: W * 0.7, sy: H * 0.9, born: performance.now(), ph: 2 }); cake = { state: 'lit', born: performance.now() - 1500, outAt: 0 }; };
 </script>
 </body>
 </html>
