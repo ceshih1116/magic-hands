@@ -297,7 +297,7 @@ function updateButterflies(hands, now, dt) {
     if (home) {
       const hx = home.x + Math.sin(now / 400 + b.slot) * home.s * 0.06, hy = home.y + Math.cos(now / 330 + b.slot) * home.s * 0.05;
       b.x = lerp(b.x, hx, ease(dt, 6)); b.y = lerp(b.y, hy, ease(dt, 6));
-      b.s = lerp(b.s, home.s * 0.2, ease(dt, 5));
+      b.s = lerp(b.s, home.s * 0.26, ease(dt, 5));
       b.ang = lerp(b.ang || 0, Math.sin(now / 600 + b.slot) * 0.25, 0.1);
     } else {
       b.vx += rand(-0.15, 0.15) * f; b.vy -= 0.02 * f; b.x += b.vx * f; b.y += b.vy * f; b.life -= 0.006 * f;
@@ -317,15 +317,16 @@ function drawButterflies() {
       const up = () => { ctx.beginPath(); ctx.moveTo(0, -s * 0.05); ctx.bezierCurveTo(s * 0.3, -s * 0.95, s * 1.1, -s * 0.85, s * 0.8, -s * 0.1); ctx.bezierCurveTo(s * 0.62, s * 0.06, s * 0.2, s * 0.04, 0, 0); };
       const lo = () => { ctx.beginPath(); ctx.moveTo(0, s * 0.02); ctx.bezierCurveTo(s * 0.55, s * 0.04, s * 0.72, s * 0.6, s * 0.32, s * 0.64); ctx.bezierCurveTo(s * 0.12, s * 0.64, s * 0.04, s * 0.3, 0, s * 0.05); };
       const g = ctx.createLinearGradient(0, -s, s, s);
-      g.addColorStop(0, `hsla(${hue},80%,92%,0.32)`); g.addColorStop(1, `hsla(${hue + 40},70%,80%,0.08)`);
+      g.addColorStop(0, `hsla(${hue},85%,88%,0.5)`); g.addColorStop(1, `hsla(${hue + 40},75%,75%,0.18)`);
       ctx.fillStyle = g; up(); ctx.fill(); lo(); ctx.fill();
+      ctx.strokeStyle = 'rgba(30,45,75,0.35)'; ctx.lineWidth = 2.2; up(); ctx.stroke(); lo(); ctx.stroke();   // keeps them visible on bright walls
       ctx.strokeStyle = `hsla(${hue},90%,94%,0.95)`; ctx.lineWidth = 0.9; ctx.shadowColor = `hsla(${hue},100%,80%,0.9)`; ctx.shadowBlur = 8;
       up(); ctx.stroke(); lo(); ctx.stroke();
       ctx.shadowBlur = 0; ctx.lineWidth = 0.5; ctx.strokeStyle = `hsla(${hue},90%,94%,0.55)`;      // veins
       ctx.beginPath(); for (const [x2, y2] of [[s * 0.75, -s * 0.55], [s * 0.85, -s * 0.2], [s * 0.4, -s * 0.75], [s * 0.45, s * 0.5]]) { ctx.moveTo(0, 0); ctx.quadraticCurveTo(x2 * 0.5, y2 * 0.3, x2, y2); } ctx.stroke();
       ctx.restore();
     }
-    ctx.strokeStyle = 'rgba(235,245,255,0.95)'; ctx.lineWidth = 1.1; ctx.beginPath(); ctx.moveTo(0, -s * 0.2); ctx.lineTo(0, s * 0.45); ctx.stroke();
+    ctx.strokeStyle = 'rgba(30,45,75,0.6)'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(0, -s * 0.2); ctx.lineTo(0, s * 0.45); ctx.stroke();
     ctx.lineWidth = 0.6; ctx.beginPath(); ctx.moveTo(0, -s * 0.2); ctx.quadraticCurveTo(-s * 0.1, -s * 0.45, -s * 0.18, -s * 0.5); ctx.moveTo(0, -s * 0.2); ctx.quadraticCurveTo(s * 0.1, -s * 0.45, s * 0.18, -s * 0.5); ctx.stroke();
     ctx.restore();
   }
@@ -438,7 +439,7 @@ function takeSnapshot(f, now, fromCanvas) {
   else { g.translate(img.width, 0); g.scale(-1, 1); g.drawImage(video, c.ox - (W - f.x1), c.oy - f.y0, c.dw, c.dh); }   // the part of you inside the frame
   shutterSound();
   const slot = polaroids.length % 6;
-  polaroids.push({ img, x: f.x0 + w / 2, y: f.y0 + h / 2, w, h, born: now,
+  polaroids.push({ img, x: f.x0 + w / 2, y: f.y0 + h / 2, w, h, born: now, start: Math.min(Math.max(w, h), Math.min(W, H) * 0.38),
     tx: W * (0.1 + slot * 0.16), ty: H * 0.8 + (slot % 2) * 14, rot: rand(-0.18, 0.18) });
   if (polaroids.length > 6) polaroids.shift();
   flashAt = now; sparkle(f.x0 + w / 2, f.y0 + h / 2, 30, Math.max(w, h) / 2);
@@ -456,8 +457,8 @@ function shutterSound() {
 }
 function drawPolaroids(now) {
   for (const p of polaroids) {
-    const age = (now - p.born) / 1000, k = clamp((age - 0.4) / 1.2, 0, 1), e = k * k * (3 - 2 * k);
-    const size = lerp(Math.max(p.w, p.h), Math.min(W, H) * 0.17, e);
+    const age = (now - p.born) / 1000, k = clamp((age - 0.15) / 0.75, 0, 1), e = k * k * (3 - 2 * k);
+    const size = lerp(p.start || Math.max(p.w, p.h), Math.min(W, H) * 0.17, e);
     const x = lerp(p.x, p.tx, e), y = lerp(p.y, p.ty, e), r = lerp(0, p.rot, e);
     const iw = size, ih = size * (p.h / p.w > 1.3 ? 1.3 : p.h / p.w < 0.75 ? 0.75 : p.h / p.w), pad = iw * 0.07;
     ctx.save(); ctx.translate(x, y); ctx.rotate(r);
@@ -466,26 +467,27 @@ function drawPolaroids(now) {
     const s = Math.max(iw / p.img.width, ih / p.img.height);
     ctx.save(); ctx.beginPath(); ctx.rect(-iw / 2, -ih / 2, iw, ih); ctx.clip();
     ctx.drawImage(p.img, -p.img.width * s / 2, -p.img.height * s / 2, p.img.width * s, p.img.height * s);
-    const dev = clamp(1 - age / 2.2, 0, 1);                      // the photo "develops" from white
+    const dev = clamp(0.3 - age / 0.5, 0, 1);                    // a quick, light "develop"
     if (dev > 0) { ctx.fillStyle = `rgba(250,248,240,${dev})`; ctx.fillRect(-iw / 2, -ih / 2, iw, ih); }
     ctx.restore();
     ctx.fillStyle = '#2a2f38'; ctx.font = `400 ${pad * 1.15}px "IBM Plex Mono", monospace`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
     ctx.fillText('22 — ' + DATE_DOTS, -iw / 2, ih / 2 + pad * 1.7);
     ctx.restore();
   }
-  const fk = (now - flashAt) / 350;                            // shutter flash
-  if (fk >= 0 && fk < 1) { ctx.save(); ctx.fillStyle = `rgba(255,255,255,${0.85 * (1 - fk)})`; ctx.fillRect(0, 0, W, H); ctx.restore(); }
+  const fk = (now - flashAt) / 220;                            // short, soft shutter flash
+  if (fk >= 0 && fk < 1) { ctx.save(); ctx.fillStyle = `rgba(255,255,255,${0.45 * (1 - fk)})`; ctx.fillRect(0, 0, W, H); ctx.restore(); }
 }
 function updateFrame(hands, now, dt) {
   const ls = hands.filter(h => h.ell);
   let box = null;
   if (ls.length === 2) {
-    const pts = [ls[0].p[4], ls[0].p[8], ls[1].p[4], ls[1].p[8]];
-    const xs = pts.map(q => q.x), ys = pts.map(q => q.y);
-    const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
-    const minS = (ls[0].size + ls[1].size) / 2 * 0.6;
-    const apart = Math.abs(ls[0].p[0].x - ls[1].p[0].x) > minS;
-    if (x1 - x0 > minS && y1 - y0 > minS * 0.6 && apart) box = { x0, y0, x1, y1 };
+    // the corner of each "L" (between the thumb and index knuckles) marks opposite corners of the frame
+    const c0 = { x: (ls[0].p[2].x + ls[0].p[5].x) / 2, y: (ls[0].p[2].y + ls[0].p[5].y) / 2 };
+    const c1 = { x: (ls[1].p[2].x + ls[1].p[5].x) / 2, y: (ls[1].p[2].y + ls[1].p[5].y) / 2 };
+    const x0 = Math.min(c0.x, c1.x), x1 = Math.max(c0.x, c1.x), y0 = Math.min(c0.y, c1.y), y1 = Math.max(c0.y, c1.y);
+    const hs = (ls[0].size + ls[1].size) / 2, bw = x1 - x0, bh = y1 - y0;
+    // two L's side by side at the same height (a flat strip) is not a frame
+    if (bw > hs * 0.9 && bh > hs * 0.9 && bw / bh < 2.4 && bh / bw < 2.4) box = { x0, y0, x1, y1 };
   }
   frameStreak = box ? frameStreak + 1 : 0;
   if (box) { lastBox = { box, t: now }; lastEllAt = now; }
@@ -556,10 +558,11 @@ let peaceStreak = 0, lastPeaceFire = 0, cake = null, tetherHands = null;
 function updatePeace(hands, now) {
   const both = hands.length === 2 && hands[0].peace && hands[1].peace;
   peaceStreak = both ? peaceStreak + 1 : 0;
-  if (both && peaceStreak >= 3 && now - lastPeaceFire > 2500) {
+  if (both && peaceStreak >= 3 && now - lastPeaceFire > 2500 && balloons.length === 0) {
     lastPeaceFire = now;
     const [a, b] = [...hands].sort((u, v) => u.p[0].x - v.p[0].x);
-    for (const h of [a, b]) balloons.push({ x: (h.p[8].x + h.p[12].x) / 2, y: h.p[0].y, vy: -1.2, sx: (h.p[8].x + h.p[12].x) / 2, sy: Math.min(h.p[8].y, h.p[12].y), hand: h === a ? 0 : 1, born: now, ph: rand(0, 6) });
+    const gap = Math.min(W, H) * 0.13;
+    for (const [i, h] of [[0, a], [1, b]]) balloons.push({ x: (h.p[8].x + h.p[12].x) / 2, y: Math.min(h.p[8].y, h.p[12].y), fx: (h.p[8].x + h.p[12].x) / 2, fy: Math.min(h.p[8].y, h.p[12].y), tx: W / 2 + (i ? gap : -gap), ty: H * 0.34, sx: (h.p[8].x + h.p[12].x) / 2, sy: Math.min(h.p[8].y, h.p[12].y), born: now, ph: rand(0, 6), a: 1 });
     tetherHands = [a, b];
     if (!cake || cake.state === 'out') cake = { state: 'lit', born: now, outAt: 0 };
     sparkle(W / 2, H * 0.55, 30, W * 0.15); say('Twenty-two');
@@ -567,17 +570,23 @@ function updatePeace(hands, now) {
 }
 function stepBalloons(dt, now) {
   const f = dt * 60;
-  for (const b of balloons) { const age = (now - b.born) / 1000; b.vy = age < 7 ? lerp(b.vy, -0.9 - beat * 0.8, 0.05) : -2.5; b.y += b.vy * f; b.ph += 0.03 * f; b.x += Math.sin(b.ph) * 0.4 * f; if (b.y < H * 0.36 && age < 7) b.y = H * 0.36 + Math.sin(b.ph) * 6; /* rest below the title line */ }
-  for (let i = balloons.length - 1; i >= 0; i--) if (balloons[i].y < -200) balloons.splice(i, 1);
+  for (const b of balloons) {
+    const age = (now - b.born) / 1000, k = clamp(age / 1.1, 0, 1), e = k * k * (3 - 2 * k);
+    b.ph += 0.03 * f;
+    b.x = lerp(b.fx, b.tx, e); b.y = lerp(b.fy, b.ty, e) + Math.sin(b.ph) * 5 * e - beat * 6;
+    const gone = (cake && cake.state === 'out' && now - cake.outAt > 3500) || !cake || age > 25;
+    if (gone) b.a -= 0.02 * f;                       // fade out after the wish
+  }
+  for (let i = balloons.length - 1; i >= 0; i--) if (balloons[i].a <= 0) balloons.splice(i, 1);
 }
 function drawBalloons(now) {
   // "2" and "2" as thin glowing outlines with a glitchy RGB split, tethered to your hands by a line of light
   for (const b of balloons) {
     const s = Math.min(W, H) * 0.2 * (1 + beat * 0.04), bx = b.x, by = b.y, age = (now - b.born) / 1000;
-    ctx.save();
+    ctx.save(); ctx.globalAlpha = clamp(b.a, 0, 1);
     const tg = ctx.createLinearGradient(bx, by + s * 0.5, b.sx || bx, b.sy || by + s * 2);
     tg.addColorStop(0, 'rgba(220,240,255,0.7)'); tg.addColorStop(1, 'rgba(220,240,255,0)');
-    ctx.strokeStyle = tg; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(bx, by + s * 0.5); ctx.lineTo(b.sx || bx, b.sy || by + s * 2); ctx.stroke();
+    if (age < 1.4) { ctx.save(); ctx.globalAlpha *= clamp(1 - age / 1.4, 0, 1); ctx.strokeStyle = tg; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(bx, by + s * 0.5); ctx.lineTo(b.sx || bx, b.sy || by + s * 2); ctx.stroke(); ctx.restore(); }   // a line of light back to your hand while it flies in
     ctx.translate(bx, by); ctx.rotate(Math.sin(b.ph) * 0.04);
     ctx.font = `400 ${s * 1.3}px "Instrument Serif", serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     const glitch = (Math.random() < 0.06 || beat > 0.7) ? rand(2, 6) : 1.2;
@@ -720,7 +729,7 @@ function drawWish(t) {
 let fileset, handLM, faceLM, hands = [], frameN = 0, lastVT = -1;
 async function loadModels() {
   fileset = await FilesetResolver.forVisionTasks(WASM);
-  const hOpts = d => ({ baseOptions: { modelAssetPath: HAND_MODEL, delegate: d }, runningMode: 'VIDEO', numHands: 2 });
+  const hOpts = d => ({ baseOptions: { modelAssetPath: HAND_MODEL, delegate: d }, runningMode: 'VIDEO', numHands: 2, minHandDetectionConfidence: 0.5, minHandPresenceConfidence: 0.5, minTrackingConfidence: 0.5 });
   try { handLM = await HandLandmarker.createFromOptions(fileset, hOpts('GPU')); } catch (e) { handLM = await HandLandmarker.createFromOptions(fileset, hOpts('CPU')); }
   faceLM = await FaceLandmarker.createFromOptions(fileset, { baseOptions: { modelAssetPath: FACE_MODEL, delegate: 'CPU' }, runningMode: 'VIDEO', numFaces: 1, outputFaceBlendshapes: true });
 }
@@ -860,7 +869,7 @@ window.__tt = () => ({ hands: hands.length, open: hands.filter(h => h.open).leng
 window.__spawnAll = () => { ['photo','emoji','word','glitter','heart','plain'].forEach((type, i) => floaters.push({ x: W * (0.15 + i * 0.14), y: H * 0.45, vx: 0, vy: -0.05, R: Math.min(W, H) * 0.07, born: performance.now() - 1000, ph: i, type, photo: i, emoji: EMOJIS[i], word: wordList()[i % wordList().length], hue: i * 50, dots: Array.from({ length: 14 }, () => [rand(-0.7, 0.7), rand(-0.7, 0.7), rand(0, 6)]), popping: 0 })); };
 window.__popAll = () => { for (const b of floaters) if (!b.popping) { b.popping = 0.01; popEffect(b); } };
 window.__showFrame = (mode) => { frame = { x0: W * 0.55, y0: H * 0.25, x1: W * 0.85, y1: H * 0.65 }; frameAmt = 1; lastFrameAt = performance.now() + 6000; frameMode = mode || 'snap'; memIdx = 2; frameSince = performance.now(); snapped = false; };
-window.__spawnCake = () => { lastPeaceFire = 0; balloons.push({ x: W * 0.4, y: H * 0.6, vy: -1.2, sx: W * 0.3, sy: H * 0.9, born: performance.now(), ph: 0 }, { x: W * 0.6, y: H * 0.6, vy: -1.2, sx: W * 0.7, sy: H * 0.9, born: performance.now(), ph: 2 }); cake = { state: 'lit', born: performance.now() - 1500, outAt: 0 }; };
+window.__spawnCake = () => { lastPeaceFire = 0; const g = Math.min(W, H) * 0.13; balloons.push({ x: W * 0.3, y: H * 0.7, fx: W * 0.3, fy: H * 0.7, tx: W / 2 - g, ty: H * 0.34, sx: W * 0.3, sy: H * 0.7, born: performance.now(), ph: 0, a: 1 }, { x: W * 0.7, y: H * 0.7, fx: W * 0.7, fy: H * 0.7, tx: W / 2 + g, ty: H * 0.34, sx: W * 0.7, sy: H * 0.7, born: performance.now(), ph: 2, a: 1 }); cake = { state: 'lit', born: performance.now() - 1500, outAt: 0 }; };
 </script>
 </body>
 </html>
