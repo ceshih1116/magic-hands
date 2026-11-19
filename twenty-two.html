@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Twenty-Two · AR Birthday</title>
+<title>AR Birthday</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
@@ -68,13 +68,13 @@
 
 <div id="setup">
   <div class="card">
-    <div class="kicker">AR · Birthday · 22</div>
-    <h1>Twenty-<i>two</i></h1>
+    <div class="kicker">AR · Birthday</div>
+    <h1>Happy <i>birthday</i></h1>
     <div class="how">
       <b>Open palm</b> — butterflies land on your fingertips<br>
       <b>Point one finger</b> — bubbles drift up (some hold your photos); poke to pop<br>
       <b>Frame with both hands</b> (two L shapes) — the space between your fingertips opens onto a starry sky: galaxy · aurora · pink dusk, one per frame<br>
-      <b>Two peace signs</b> — 22 and a holographic cake<br>
+      <b>Two peace signs</b> — your age and a birthday cake<br>
       <b>Close your eyes</b> — your wish, in constellations<br>
       <b>Blow "hooo"</b> — the candles dissolve<br>
       <b>Music sync</b> — play your song out loud; everything moves to the beat
@@ -85,8 +85,8 @@
       <div id="thumbs"></div>
     </div>
     <div class="row">
-      <label class="t">Birthday (printed on your photos)</label>
-      <input type="date" id="bday">
+      <label class="t">How old are you turning?</label>
+      <input type="number" id="age" min="1" max="150" value="22" inputmode="numeric">
     </div>
     <div class="row">
       <label class="t">Your wish</label>
@@ -211,7 +211,8 @@ function analyzeHand(lms, wl, side) {
   const n = ext.filter(Boolean).length;
   const open = n >= 4;
   const peace = ext[0] && ext[1] && !ext[2] && !ext[3] && dist(p[8], p[12]) > dist(p[0], p[9]) * 0.3;
-  const ell = r(8, 6) > 1.1 && r(12, 10) < 1.12 && r(16, 14) < 1.12 && r(20, 18) < 1.15 && thumbAway;   // "L" shape for the frame
+  // "L" for the frame: index out, thumb out, the other fingers may stay relaxed (half open) — the frame itself also needs the two index fingers to point opposite ways
+  const ell = r(8, 6) > 1.15 && r(12, 10) < 1.25 && r(16, 14) < 1.22 && r(20, 18) < 1.22 && r(8, 6) - r(12, 10) > 0.05 && thumbAway;
   const point = ext[0] && !ext[1] && !ext[2] && !ext[3];           // ☝️ index finger only
   return { p, open, peace, ell, point, side, size: dist(p[0], p[9]), idxR: r(8, 6), thumbAway };
 }
@@ -333,7 +334,7 @@ function drawButterflies() {
 const floaters = [];
 let floatCount = 0;
 const EMOJIS = ['🎂', '🍰', '🎈', '🍓', '💖', '⭐', '🧁', '🎀', '🌷', '🍒'];
-function wordList() { return ['22', 'happy', $('wish1').value, $('wish2').value, '♡', 'love you'].filter(Boolean); }
+function wordList() { return [String(AGE), 'happy', $('wish1').value, $('wish2').value, '♡', 'love you'].filter(Boolean); }
 // mix of bubble types: photo / sticker / word / glitter / heart / plain
 let photoTurn = 0;
 function pickType() { return (floatCount % 5 === 2 && photos.length) ? 'photo' : 'plain'; }   // mostly clear bubbles, about 1 in 5 has a photo
@@ -346,7 +347,7 @@ function popEffect(b) {
 }
 const lastTip = {};
 function updateFloaters(hands, now, dt) {
-  const framing = frameAmt > 0.3 || hands.filter(h => h.ell).length === 2;
+  const framing = frameAmt > 0.3;
   const tips = hands.filter(h => h.point).map(h => ({ ...h.p[8], size: h.size, key: h.side }));
   if (!framing) for (const tp of tips) {
     const prev = lastTip[tp.key], moved = prev ? Math.hypot(tp.x - prev.x, tp.y - prev.y) : 0;
@@ -416,14 +417,25 @@ function drawFloaters() {
 let frame = null, frameAmt = 0, lastFrameAt = 0, frameStreak = 0, lastQuad = null, skyIdx = -1, frameSince = 0;
 const SKIES = ['galaxy', 'aurora', 'dusk'], SKY_NAMES = { galaxy: 'Galaxy', aurora: 'Aurora', dusk: 'Pink dusk' };
 const skyTex = {};
-// birthday date: from the setup field (defaults to today; a personal build can preset it)
-let DATE_STAMP = '', DATE_DOTS = '';
-function setDate(iso) {
-  const d = iso ? new Date(iso + 'T12:00:00') : new Date();
-  const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), dd = String(d.getDate()).padStart(2, '0');
-  DATE_STAMP = "'" + String(y).slice(2) + ' ' + m + ' ' + dd; DATE_DOTS = `${y}.${m}.${dd}`;
+// age: from the setup field (a personal build can preset it)
+let AGE = 22, AGE_DIGITS = ['2', '2'], AGE_ORD = 'twenty-second', AGE_WORD = 'twenty-two';
+function numWords(n) {
+  const ones = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
+  const tens = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
+  if (n < 20) return ones[n];
+  if (n < 100) return tens[(n / 10) | 0] + (n % 10 ? '-' + ones[n % 10] : '');
+  return numWords((n / 100) | 0) + ' hundred' + (n % 100 ? ' and ' + numWords(n % 100) : '');
 }
-(() => { const el = $('bday'), d = new Date(); el.value = window.__PRESET_DATE || `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; setDate(el.value); el.onchange = () => setDate(el.value); })();
+function ordWords(n) {
+  const w = numWords(n), m = w.match(/^(.*?)([a-z]+)$/), last = m[2];
+  const irr = { one: 'first', two: 'second', three: 'third', five: 'fifth', eight: 'eighth', nine: 'ninth', twelve: 'twelfth' };
+  return m[1] + (irr[last] || (last.endsWith('y') ? last.slice(0, -1) + 'ieth' : last + 'th'));
+}
+function setAge(v) {
+  AGE = clamp(parseInt(v, 10) || 22, 1, 150); AGE_DIGITS = String(AGE).split(''); AGE_ORD = ordWords(AGE); AGE_WORD = numWords(AGE);
+  document.title = `Happy ${AGE_ORD} · AR Birthday`;
+}
+(() => { const el = $('age'); el.value = window.__PRESET_AGE || 22; setAge(el.value); el.oninput = () => setAge(el.value); })();
 function makeSky(kind) {
   const S = 1024, c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d');
   const band = x => S * 0.5 + (x - S * 0.5) * 0.55;                    // the milky way runs diagonally
@@ -468,60 +480,72 @@ function makeSky(kind) {
   return c;
 }
 const twinkles = Array.from({ length: 46 }, () => ({ u: rand(-480, 480), v: rand(-480, 480), ph: rand(0, 6), sp: rand(1.5, 4), r: rand(1.4, 3) }));
+// the window's outline runs along each hand's index finger (tip → knuckle) and thumb (base → tip)
+const FRAME_IDX = [8, 7, 6, 5, 2, 3, 4];
 function updateFrame(hands, now, dt) {
   const ls = hands.filter(h => h.ell).sort((a, b) => a.p[0].x - b.p[0].x);
-  let quad = null;
+  let shape = null;
   if (ls.length === 2) {
-    const pts = [ls[0].p[8], ls[0].p[4], ls[1].p[8], ls[1].p[4]];           // the four fingertips are the corners
-    const o = poly(pts), hs = (ls[0].size + ls[1].size) / 2;
-    if (polyArea(o) > hs * hs * 0.8) quad = pts;
+    const [A, B] = ls, va = { x: A.p[8].x - A.p[5].x, y: A.p[8].y - A.p[5].y }, vb = { x: B.p[8].x - B.p[5].x, y: B.p[8].y - B.p[5].y };
+    const cos = (va.x * vb.x + va.y * vb.y) / ((Math.hypot(va.x, va.y) * Math.hypot(vb.x, vb.y)) || 1);
+    // a real frame has the two index fingers pointing opposite ways; two raised pointing fingers (bubbles) point the same way
+    if (cos < -0.2) {
+      const a = FRAME_IDX.map(i => A.p[i]), b = FRAME_IDX.map(i => B.p[i]);
+      const rev = dist(A.p[4], B.p[4]) < dist(A.p[4], B.p[8]);      // go round from A's thumb tip to whichever of B's tips is nearer
+      const hs = (A.size + B.size) / 2;
+      if (polyArea([...a, ...(rev ? [...b].reverse() : b)]) > hs * hs * 0.7) shape = { a, b, rev };
+    }
   }
-  frameStreak = quad ? frameStreak + 1 : 0;
-  if (quad) lastQuad = { quad, t: now };
-  if (!quad && lastQuad && now - lastQuad.t < 350 && frameAmt > 0.3) { quad = lastQuad.quad; frameStreak = 2; }   // ride over short detection gaps
-  if (quad && frameStreak >= 2) {
-    if (frameAmt < 0.05 && now - lastFrameAt > 600) {
-      skyIdx++; frameSince = now; frame = quad.map(p => ({ x: p.x, y: p.y }));
-      const c = centroid(frame); sparkle(c.x, c.y, 24, 60);
+  frameStreak = shape ? frameStreak + 1 : 0;
+  if (shape) lastQuad = { shape, t: now };
+  if (!shape && lastQuad && now - lastQuad.t < 350 && frameAmt > 0.3) { shape = lastQuad.shape; frameStreak = 3; }   // ride over short detection gaps
+  if (shape && frameStreak >= 3) {
+    if (!frame || (frameAmt < 0.05 && now - lastFrameAt > 600)) {
+      if (frameAmt < 0.05) { skyIdx++; frameSince = now; }
+      frame = { a: shape.a.map(p => ({ x: p.x, y: p.y })), b: shape.b.map(p => ({ x: p.x, y: p.y })), rev: shape.rev };
+      const c = centroid(framePts()); sparkle(c.x, c.y, 24, 60);
     }
     lastFrameAt = now;
-    const k = ease(dt, 18); frame = frame.map((p, i) => ({ x: lerp(p.x, quad[i].x, k), y: lerp(p.y, quad[i].y, k) }));
+    const k = ease(dt, 20), sm = (P, Q) => P.map((p, i) => ({ x: lerp(p.x, Q[i].x, k), y: lerp(p.y, Q[i].y, k) }));
+    frame = { a: sm(frame.a, shape.a), b: sm(frame.b, shape.b), rev: shape.rev };
     frameAmt = lerp(frameAmt, 1, ease(dt, 5));
     say(SKY_NAMES[SKIES[skyIdx % SKIES.length]] + ' — stretch your hands to open the sky');
-  } else if (now - lastFrameAt > 250) frameAmt = lerp(frameAmt, 0, ease(dt, 5));
+  } else if (now - lastFrameAt > 250) frameAmt = lerp(frameAmt, 0, ease(dt, 6));
 }
+const framePts = () => [...frame.a, ...(frame.rev ? [...frame.b].reverse() : frame.b)];
 const centroid = ps => ({ x: ps.reduce((a, p) => a + p.x, 0) / ps.length, y: ps.reduce((a, p) => a + p.y, 0) / ps.length });
-function poly(ps) { const c = centroid(ps); return [...ps].sort((a, b) => Math.atan2(a.y - c.y, a.x - c.x) - Math.atan2(b.y - c.y, b.x - c.x)); }
 function polyArea(ps) { let s = 0; for (let i = 0; i < ps.length; i++) { const a = ps[i], b = ps[(i + 1) % ps.length]; s += a.x * b.y - b.x * a.y; } return Math.abs(s) / 2; }
-// a straight-edged window through the fingertips, with slightly rounded corners
-function quadPath(q) {
+// a smooth curve through the finger joints
+function shapePath(q) {
   ctx.beginPath();
-  const n = q.length, m0 = { x: (q[n - 1].x + q[0].x) / 2, y: (q[n - 1].y + q[0].y) / 2 };
-  ctx.moveTo(m0.x, m0.y);
-  for (let i = 0; i < n; i++) { const a = q[i], b = q[(i + 1) % n]; ctx.arcTo(a.x, a.y, (a.x + b.x) / 2, (a.y + b.y) / 2, Math.min(12, dist(a, b) * 0.12)); }
+  const n = q.length, m = i => ({ x: (q[i].x + q[(i + 1) % n].x) / 2, y: (q[i].y + q[(i + 1) % n].y) / 2 });
+  const s = m(n - 1); ctx.moveTo(s.x, s.y);
+  for (let i = 0; i < n; i++) { const e = m(i); ctx.quadraticCurveTo(q[i].x, q[i].y, e.x, e.y); }
   ctx.closePath();
 }
 function drawFrame(now) {
   if (!frame || frameAmt < 0.02) return;
   const kind = SKIES[((skyIdx % SKIES.length) + SKIES.length) % SKIES.length], tex = skyTex[kind] || (skyTex[kind] = makeSky(kind));
-  const t = now / 1000, c = centroid(frame), k = 1 - Math.pow(1 - clamp(frameAmt, 0, 1), 2);
-  const q = poly(frame).map(p => ({ x: c.x + (p.x - c.x) * k, y: c.y + (p.y - c.y) * k }));   // opens like an iris
-  const a = { x: (frame[0].x + frame[1].x) / 2, y: (frame[0].y + frame[1].y) / 2 }, b = { x: (frame[2].x + frame[3].x) / 2, y: (frame[2].y + frame[3].y) / 2 };
-  const span = Math.max(160, dist(a, b)), ang = Math.atan2(b.y - a.y, b.x - a.x) * 0.35, sc = span * 1.4 / 1024;
+  const t = now / 1000, pts = framePts(), c = centroid(pts), k = 1 - Math.pow(1 - clamp(frameAmt, 0, 1), 2);
+  const hs = dist(frame.a[0], frame.a[3]) + dist(frame.b[0], frame.b[3]), inset = hs * 0.04;   // tuck the edge just inside your fingers
+  const q = pts.map(p => { const dx = c.x - p.x, dy = c.y - p.y, d = Math.hypot(dx, dy) || 1, s = Math.min(inset, d * 0.3) / d;
+    const x = p.x + dx * s, y = p.y + dy * s; return { x: c.x + (x - c.x) * k, y: c.y + (y - c.y) * k }; });   // opens like an iris
+  const ca = centroid(frame.a), cb = centroid(frame.b);
+  const xs = q.map(p => p.x), ys = q.map(p => p.y), span = Math.max(160, Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)));
+  const ang = Math.atan2(cb.y - ca.y, cb.x - ca.x) * 0.35, sc = span * 1.15 / 1024;
   ctx.save(); ctx.globalAlpha = clamp(frameAmt * 1.4, 0, 1);
-  // glow around the window
-  quadPath(q); ctx.save(); ctx.shadowColor = 'rgba(205,175,255,0.9)'; ctx.shadowBlur = 34; ctx.fillStyle = '#120c30'; ctx.fill(); ctx.restore();
-  ctx.save(); quadPath(q); ctx.clip();
+  shapePath(q); ctx.save(); ctx.shadowColor = 'rgba(205,175,255,0.9)'; ctx.shadowBlur = 30; ctx.fillStyle = '#120c30'; ctx.fill(); ctx.restore();
+  ctx.save(); shapePath(q); ctx.clip();
   ctx.translate(c.x, c.y); ctx.rotate(ang); ctx.scale(sc, sc);
-  ctx.drawImage(tex, -512 + Math.sin(t * 0.07) * 50, -512 + Math.cos(t * 0.05) * 40);
+  ctx.drawImage(tex, -512 + Math.sin(t * 0.07) * 40, -512 + Math.cos(t * 0.05) * 30);
   ctx.globalCompositeOperation = 'lighter';
-  for (const s of twinkles) {                                             // twinkling stars
+  for (const s of twinkles) {
     const al = Math.pow(0.5 + 0.5 * Math.sin(t * s.sp + s.ph), 3); if (al < 0.05) continue;
     const r = s.r / sc; ctx.strokeStyle = `rgba(255,255,255,${al})`; ctx.fillStyle = `rgba(255,255,255,${al})`; ctx.lineWidth = 0.7 / sc;
     ctx.beginPath(); ctx.arc(s.u, s.v, r * 0.45, 0, Math.PI * 2); ctx.fill();
     ctx.beginPath(); ctx.moveTo(s.u - r * 2.2, s.v); ctx.lineTo(s.u + r * 2.2, s.v); ctx.moveTo(s.u, s.v - r * 2.2); ctx.lineTo(s.u, s.v + r * 2.2); ctx.stroke();
   }
-  const sp = 2.6, ph = (t % sp) / 0.8, seed = Math.floor(t / sp);           // a shooting star every few seconds
+  const sp = 2.6, ph = (t % sp) / 0.8, seed = Math.floor(t / sp);
   if (ph < 1) {
     const sx = Math.sin(seed * 12.9898) * 300, sy = Math.cos(seed * 78.233) * 260 - 120, dx = 380 * ph, len = 160;
     const lg = ctx.createLinearGradient(sx + dx - len, sy + dx * 0.45 - len * 0.45, sx + dx, sy + dx * 0.45);
@@ -529,21 +553,20 @@ function drawFrame(now) {
     ctx.strokeStyle = lg; ctx.lineWidth = 2 / sc; ctx.beginPath(); ctx.moveTo(sx + dx - len, sy + dx * 0.45 - len * 0.45); ctx.lineTo(sx + dx, sy + dx * 0.45); ctx.stroke();
   }
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  const shx = c.x + Math.sin(t * 0.6) * span * 0.6, sh = ctx.createLinearGradient(shx - span * 0.4, c.y - span * 0.4, shx + span * 0.4, c.y + span * 0.4);   // glassy sheen
+  const shx = c.x + Math.sin(t * 0.6) * span * 0.5, sh = ctx.createLinearGradient(shx - span * 0.4, c.y - span * 0.4, shx + span * 0.4, c.y + span * 0.4);
   sh.addColorStop(0, 'rgba(255,255,255,0)'); sh.addColorStop(0.5, 'rgba(255,255,255,0.08)'); sh.addColorStop(1, 'rgba(255,255,255,0)');
   ctx.fillStyle = sh; ctx.fillRect(0, 0, W, H);
   ctx.restore();
-  // iridescent edge + glints at the fingertips
   const eg = ctx.createLinearGradient(c.x - span / 2, c.y, c.x + span / 2, c.y);
   eg.addColorStop(0, '#ffd2ec'); eg.addColorStop(0.5, '#ffffff'); eg.addColorStop(1, '#c6e2ff');
-  quadPath(q); ctx.strokeStyle = eg; ctx.lineWidth = 1.4; ctx.shadowColor = 'rgba(230,215,255,0.95)'; ctx.shadowBlur = 12; ctx.stroke(); ctx.shadowBlur = 0;
-  for (const p of frame) {
+  shapePath(q); ctx.strokeStyle = eg; ctx.lineWidth = 1.3; ctx.shadowColor = 'rgba(230,215,255,0.95)'; ctx.shadowBlur = 12; ctx.stroke(); ctx.shadowBlur = 0;
+  for (const p of [frame.a[0], frame.a[6], frame.b[0], frame.b[6]]) {   // glints on the four fingertips
     const r = 5 + 2 * Math.sin(t * 4 + p.x); ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = 'rgba(255,255,255,0.9)';
     ctx.beginPath(); ctx.moveTo(p.x, p.y - r * 1.8); ctx.quadraticCurveTo(p.x, p.y, p.x + r * 1.8, p.y); ctx.quadraticCurveTo(p.x, p.y, p.x, p.y + r * 1.8); ctx.quadraticCurveTo(p.x, p.y, p.x - r * 1.8, p.y); ctx.quadraticCurveTo(p.x, p.y, p.x, p.y - r * 1.8); ctx.fill(); ctx.restore();
   }
-  const low = q.reduce((m, p) => p.y > m.y ? p : m, q[0]);
+  const low = Math.max(...ys);
   ctx.font = '400 10px "IBM Plex Mono", monospace'; ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-  ctx.fillText(`N° 22  ·  ${SKY_NAMES[kind].toUpperCase()}  ·  ${DATE_DOTS}`, c.x, low.y + 12);
+  ctx.fillText(`N° ${AGE}  ·  ${SKY_NAMES[kind].toUpperCase()}`, c.x, low + 14);
   ctx.restore();
 }
 
@@ -556,19 +579,29 @@ function updatePeace(hands, now) {
   if (both && peaceStreak >= 3 && now - lastPeaceFire > 2500 && balloons.length === 0) {
     lastPeaceFire = now;
     const [a, b] = [...hands].sort((u, v) => u.p[0].x - v.p[0].x);
-    const gap = Math.min(W, H) * 0.13;
-    for (const [i, h] of [[0, a], [1, b]]) balloons.push({ x: (h.p[8].x + h.p[12].x) / 2, y: Math.min(h.p[8].y, h.p[12].y), fx: (h.p[8].x + h.p[12].x) / 2, fy: Math.min(h.p[8].y, h.p[12].y), tx: W / 2 + (i ? gap : -gap), ty: H * 0.34, sx: (h.p[8].x + h.p[12].x) / 2, sy: Math.min(h.p[8].y, h.p[12].y), born: now, ph: rand(0, 6), a: 1 });
+    spawnDigits([a, b].map(h => ({ x: (h.p[8].x + h.p[12].x) / 2, y: Math.min(h.p[8].y, h.p[12].y) })), now);
     tetherHands = [a, b];
     if (!cake || cake.state === 'out') cake = { state: 'lit', born: now, outAt: 0 };
-    sparkle(W / 2, H * 0.55, 30, W * 0.15); say('Twenty-two');
+    sparkle(W / 2, H * 0.55, 30, W * 0.15); say(AGE_WORD[0].toUpperCase() + AGE_WORD.slice(1));
   }
 }
+// one glowing numeral per digit of your age; they fly out of your hands to the top of the screen
+function spawnDigits(from, now) {
+  const n = AGE_DIGITS.length, gap = Math.min(W, H) * 0.26;
+  AGE_DIGITS.forEach((ch, i) => {
+    const h = from[n === 1 ? 0 : Math.round(i / (n - 1) * (from.length - 1))];
+    const side = n === 1 ? -1 : (i < n / 2 ? -1 : 1), j = side < 0 ? i : n - 1 - i;   // where it waits while a wish or greeting is on screen
+    balloons.push({ ch, x: h.x, y: h.y, fx: h.x, fy: h.y, tx: W / 2 + (i - (n - 1) / 2) * gap, ty: H * 0.36, wx: W / 2 + side * (W * 0.37 - j * gap * 0.75), wy: H * 0.5, sx: h.x, sy: h.y, born: now, ph: rand(0, 6), a: 1 });
+  });
+}
+let asideK = 0;
 function stepBalloons(dt, now) {
   const f = dt * 60;
   for (const b of balloons) {
     const age = (now - b.born) / 1000, k = clamp(age / 1.1, 0, 1), e = k * k * (3 - 2 * k);
     b.ph += 0.03 * f;
-    b.x = lerp(b.fx, b.tx, e); b.y = lerp(b.fy, b.ty, e) + Math.sin(b.ph) * 5 * e - beat * 6;
+    const tx = lerp(b.tx, b.wx, asideK), ty = lerp(b.ty, b.wy, asideK);        // step aside so they never cover the wish or the greeting
+    b.x = lerp(b.fx, tx, e); b.y = lerp(b.fy, ty, e) + Math.sin(b.ph) * 5 * e - beat * 6;
     const gone = (cake && cake.state === 'out' && now - cake.outAt > 3500) || !cake || age > 25;
     if (gone) b.a -= 0.02 * f;                       // fade out after the wish
   }
@@ -577,7 +610,7 @@ function stepBalloons(dt, now) {
 function drawBalloons(now) {
   // "2" and "2" as thin glowing outlines with a glitchy RGB split, tethered to your hands by a line of light
   for (const b of balloons) {
-    const s = Math.min(W, H) * 0.2 * (1 + beat * 0.04), bx = b.x, by = b.y, age = (now - b.born) / 1000;
+    const s = Math.min(W, H) * 0.2 * (1 + beat * 0.04) * (1 - asideK * 0.3), bx = b.x, by = b.y, age = (now - b.born) / 1000;
     ctx.save(); ctx.globalAlpha = clamp(b.a, 0, 1);
     const tg = ctx.createLinearGradient(bx, by + s * 0.5, b.sx || bx, b.sy || by + s * 2);
     tg.addColorStop(0, 'rgba(220,240,255,0.7)'); tg.addColorStop(1, 'rgba(220,240,255,0)');
@@ -586,11 +619,11 @@ function drawBalloons(now) {
     ctx.font = `400 ${s * 1.3}px "Instrument Serif", serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     const glitch = (Math.random() < 0.06 || beat > 0.7) ? rand(2, 6) : 1.2;
     ctx.globalCompositeOperation = 'lighter'; ctx.lineWidth = 1.2;
-    ctx.strokeStyle = 'rgba(255,60,90,0.55)'; ctx.strokeText('2', -glitch, 0);
-    ctx.strokeStyle = 'rgba(60,200,255,0.55)'; ctx.strokeText('2', glitch, 0);
-    ctx.strokeStyle = 'rgba(245,250,255,0.95)'; ctx.shadowColor = '#bfe3ff'; ctx.shadowBlur = 16; ctx.strokeText('2', 0, 0);
+    ctx.strokeStyle = 'rgba(255,60,90,0.55)'; ctx.strokeText(b.ch, -glitch, 0);
+    ctx.strokeStyle = 'rgba(60,200,255,0.55)'; ctx.strokeText(b.ch, glitch, 0);
+    ctx.strokeStyle = 'rgba(245,250,255,0.95)'; ctx.shadowColor = '#bfe3ff'; ctx.shadowBlur = 16; ctx.strokeText(b.ch, 0, 0);
     // scanline fill
-    ctx.save(); ctx.globalAlpha = 0.18; ctx.fillStyle = '#dff1ff'; ctx.shadowBlur = 0; ctx.fillText('2', 0, 0); ctx.restore();
+    ctx.save(); ctx.globalAlpha = 0.18; ctx.fillStyle = '#dff1ff'; ctx.shadowBlur = 0; ctx.fillText(b.ch, 0, 0); ctx.restore();
     ctx.restore();
     if (age < 0.6) sparkle(bx, by, 2, s * 0.5);
   }
@@ -682,12 +715,12 @@ function drawCake(now, t) {
 
   // gold number candles "2" "2" and their flames
   const topY = y + cw * 0.02;
-  for (const [i, dx] of [[0, -0.07], [1, 0.07]]) {
-    const x = cx + cw * dx, fs = cw * 0.22;
+  AGE_DIGITS.forEach((ch, i) => {
+    const x = cx + cw * (i - (AGE_DIGITS.length - 1) / 2) * 0.14, fs = cw * 0.22;
     ctx.font = `400 ${fs}px "Instrument Serif", serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
     const cg = ctx.createLinearGradient(x - fs * 0.3, topY - fs * 0.7, x + fs * 0.3, topY); cg.addColorStop(0, '#fff7dc'); cg.addColorStop(0.45, '#f3c86f'); cg.addColorStop(1, '#c58b3a');
-    ctx.save(); ctx.shadowColor = 'rgba(255,215,140,0.7)'; ctx.shadowBlur = 10; ctx.fillStyle = cg; ctx.fillText('2', x, topY); ctx.restore();
-    ctx.strokeStyle = 'rgba(150,100,40,0.6)'; ctx.lineWidth = 0.8; ctx.strokeText('2', x, topY);
+    ctx.save(); ctx.shadowColor = 'rgba(255,215,140,0.7)'; ctx.shadowBlur = 10; ctx.fillStyle = cg; ctx.fillText(ch, x, topY); ctx.restore();
+    ctx.strokeStyle = 'rgba(150,100,40,0.6)'; ctx.lineWidth = 0.8; ctx.strokeText(ch, x, topY);
     const wy = topY - fs * 0.7;
     ctx.strokeStyle = 'rgba(80,70,70,0.9)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, wy); ctx.lineTo(x, wy - 7); ctx.stroke();
     const fy = wy - 7;
@@ -704,12 +737,12 @@ function drawCake(now, t) {
       if (Math.random() < 0.2) parts.push({ k: 'u', x: x + rand(-2, 2), y: fy - 18, vx: 0, vy: rand(-0.9, -0.3), r: rand(0.7, 1.4), life: 1, d: 0.03, ph: rand(0, 6) });
     } else if (now - cake.outAt < 3000 && Math.random() < 0.5) parts.push({ k: 'u', x: x + rand(-3, 3), y: fy, vx: rand(-0.2, 0.2), vy: rand(-1.6, -0.6), r: rand(0.8, 2), life: 1, d: rand(0.008, 0.015), ph: rand(0, 6) });
     if (i === 0) cake.wick = [{ x, y: fy }]; else cake.wick.push({ x, y: fy });
-  }
+  });
   // light motes drifting around the cake
   for (let i = 0; i < 18; i++) { const a = t * 0.35 + i * 0.39, rr = cw * (0.58 + 0.12 * Math.sin(i * 1.7)), yy = base - totalH * (0.15 + 0.7 * ((i * 0.37 + t * 0.05) % 1));
     const x = cx + Math.cos(a) * rr, zf = Math.sin(a); ctx.fillStyle = `rgba(255,236,246,${0.3 + 0.5 * (zf + 1) / 2})`; ctx.beginPath(); ctx.arc(x, yy, 0.9 + (zf + 1) * 0.7, 0, Math.PI * 2); ctx.fill(); }
   ctx.font = '400 10px "IBM Plex Mono", monospace'; ctx.fillStyle = 'rgba(255,240,248,0.75)'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-  ctx.fillText(lit ? '22  ·  CANDLES LIT' : '22  ·  WISH SENT', cx + cw * 0.76, base - 4);
+  ctx.fillText(lit ? `${AGE}  ·  CANDLES LIT` : `${AGE}  ·  WISH SENT`, cx + cw * 0.76, base - 4);
   ctx.restore();
 }
 
@@ -805,6 +838,10 @@ function loop() {
   // wish: eyes closed for 0.4 s; stays 2.5 s after opening
   let wantWish = eyesClosed ? now - eyesClosedSince > 400 : (now - eyesOpenSince < 2500 && wishAmt > 0.3);
   if (window.__forceWish) wantWish = true;
+  const greeting = cake && cake.state === 'out' && now - cake.outAt < 4000;
+  if (greeting) wantWish = false;                       // the wish makes way for "Happy …" so the two never overlap
+  if (greeting) wishAmt = lerp(wishAmt, 0, ease(dt, 8));
+  asideK = lerp(asideK, (wishAmt > 0.05 || greeting) ? 1 : 0, ease(dt, 4));
   wishAmt = lerp(wishAmt, wantWish ? 1 : 0, ease(dt, wantWish ? 3 : 1.2));
   if (wishAmt > 0.5) say('Make a wish');
   // blow out the candles: mouth open / rounded for 0.3 s while the cake is lit
@@ -843,11 +880,11 @@ function loop() {
   drawWish(t); drawCake(now, t); drawBalloons(now); drawFrame(now);
   drawFloaters(); drawButterflies(); drawParts();
   if (cake && cake.state === 'out' && now - cake.outAt < 4000) {
-    const k = (now - cake.outAt) / 4000, fs = Math.min(W * 0.075, 86);
+    const k = (now - cake.outAt) / 4000, fs = Math.min(W * 0.075, 86, W * 1.5 / Math.max(10, AGE_ORD.length + 6));
     ctx.save(); ctx.globalAlpha = Math.min(1, (1 - k) * 2, k * 6); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.font = `italic 400 ${fs}px "Instrument Serif", serif`; ctx.fillStyle = '#f4f8fc'; ctx.shadowColor = 'rgba(170,210,255,0.8)'; ctx.shadowBlur = 22;
-    ctx.fillText('Happy twenty-second', W / 2, H * 0.17);
-    ctx.shadowBlur = 0; ctx.font = `400 11px "IBM Plex Mono", monospace`; ctx.fillStyle = 'rgba(220,235,255,0.7)'; ctx.fillText('B I R T H D A Y   ·   ' + DATE_DOTS, W / 2, H * 0.17 + fs * 0.7);
+    ctx.fillText('Happy ' + AGE_ORD, W / 2, H * 0.17);
+    ctx.shadowBlur = 0; ctx.font = `400 11px "IBM Plex Mono", monospace`; ctx.fillStyle = 'rgba(220,235,255,0.7)'; ctx.fillText('B I R T H D A Y   ·   N° ' + AGE, W / 2, H * 0.17 + fs * 0.7);
     ctx.restore();
   }
 }
@@ -889,8 +926,9 @@ window.__tt = () => ({ hands: hands.length, open: hands.filter(h => h.open).leng
   bubbles: flies.filter(f => !f.free).length, flies: flies.length, point: hands.filter(h => h.point).length, floaters: floaters.length, frame: +frameAmt.toFixed(2), cake: cake ? cake.state : null, wish: +wishAmt.toFixed(2), eyesClosed, mouth: +mouthOpen.toFixed(2), photos: photos.length });
 window.__spawnAll = () => { ['photo','emoji','word','glitter','heart','plain'].forEach((type, i) => floaters.push({ x: W * (0.15 + i * 0.14), y: H * 0.45, vx: 0, vy: -0.05, R: Math.min(W, H) * 0.07, born: performance.now() - 1000, ph: i, type, photo: i, emoji: EMOJIS[i], word: wordList()[i % wordList().length], hue: i * 50, dots: Array.from({ length: 14 }, () => [rand(-0.7, 0.7), rand(-0.7, 0.7), rand(0, 6)]), popping: 0 })); };
 window.__popAll = () => { for (const b of floaters) if (!b.popping) { b.popping = 0.01; popEffect(b); } };
-window.__showFrame = (k) => { frame = [{ x: W * 0.52, y: H * 0.22 }, { x: W * 0.56, y: H * 0.62 }, { x: W * 0.88, y: H * 0.3 }, { x: W * 0.84, y: H * 0.7 }]; frameAmt = 1; lastFrameAt = performance.now() + 60000; skyIdx = k || 0; frameSince = performance.now(); };
-window.__spawnCake = () => { lastPeaceFire = 0; const g = Math.min(W, H) * 0.13; balloons.push({ x: W * 0.3, y: H * 0.7, fx: W * 0.3, fy: H * 0.7, tx: W / 2 - g, ty: H * 0.34, sx: W * 0.3, sy: H * 0.7, born: performance.now(), ph: 0, a: 1 }, { x: W * 0.7, y: H * 0.7, fx: W * 0.7, fy: H * 0.7, tx: W / 2 + g, ty: H * 0.34, sx: W * 0.7, sy: H * 0.7, born: performance.now(), ph: 2, a: 1 }); cake = { state: 'lit', born: performance.now() - 1500, outAt: 0 }; };
+window.__showFrame = (k) => { const L = (cx, cy, s) => [[0, -1.6], [0, -1.1], [0, -0.6], [0, 0], [0.45, 0.05], [0.95, 0.05], [1.4, 0.05]].map(([u, v]) => ({ x: cx + u * s, y: cy + v * s }));
+  const a = L(W * 0.55, H * 0.62, 90), b = L(W * 0.85, H * 0.28, -90); frame = { a, b, rev: false }; frameAmt = 1; lastFrameAt = performance.now() + 60000; skyIdx = k || 0; frameSince = performance.now(); };
+window.__spawnCake = () => { lastPeaceFire = 0; spawnDigits([{ x: W * 0.3, y: H * 0.7 }, { x: W * 0.7, y: H * 0.7 }], performance.now()); cake = { state: 'lit', born: performance.now() - 1500, outAt: 0 }; };
 </script>
 </body>
 </html>
