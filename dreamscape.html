@@ -4,74 +4,85 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dreamscape · AR Daydream</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { width: 100%; height: 100%; overflow: hidden; background: #0d1830;
-    font-family: -apple-system, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif; color: #fff; }
-  video { position: fixed; left: 0; top: 0; width: 2px; height: 2px; opacity: 0.01; pointer-events: none; z-index: -1; } /* iPhone Safari will not play a display:none video */
-  canvas#c { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0b0f18; color: #fff;
+    font-family: "IBM Plex Mono", ui-monospace, monospace; }
+  video { position: fixed; left: 0; top: 0; width: 2px; height: 2px; opacity: 0.01; pointer-events: none; z-index: -1; }
+  canvas#gl, canvas#c { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
+  canvas#c { visibility: hidden; }            /* the 2D scene is drawn here, the WebGL layer shows it (with the water) */
+  body.no-gl canvas#c { visibility: visible; } body.no-gl canvas#gl { display: none; }
   .ui { transition: opacity .35s ease; }
   body.hide-ui .ui { opacity: 0; pointer-events: none; }
   body.hide-ui #eyeBtn { opacity: .15; }
-  .pill { background: rgba(10, 25, 50, .38); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(255,255,255,.22); border-radius: 999px; }
-  #status { position: fixed; top: 16px; left: 16px; z-index: 5; padding: 7px 14px; font-size: 14px; display: flex; gap: 8px; align-items: center; }
-  #beatDot { width: 9px; height: 9px; border-radius: 50%; background: rgba(255,255,255,.35); transition: transform .08s; }
-  #tools { position: fixed; top: 16px; right: 62px; z-index: 5; display: flex; gap: 8px; }
-  .btn { height: 38px; min-width: 38px; padding: 0 13px; cursor: pointer; color: #fff; font-size: 14px;
-    background: rgba(10, 25, 50, .38); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(255,255,255,.22); border-radius: 999px; }
-  .btn:hover { background: rgba(255,255,255,.2); }
-  .btn.on { background: rgba(140, 190, 255, .5); }
+  .pill, .btn { background: rgba(12, 16, 26, .42); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,.16); border-radius: 6px; }
+  #status { position: fixed; top: 16px; left: 16px; z-index: 5; padding: 8px 12px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; display: flex; gap: 8px; align-items: center; }
+  #beatDot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.35); transition: transform .08s; }
+  #tools { position: fixed; top: 16px; right: 60px; z-index: 5; display: flex; gap: 8px; }
+  .btn { height: 34px; min-width: 34px; padding: 0 12px; cursor: pointer; color: #fff; font: 500 11px "IBM Plex Mono", monospace; letter-spacing: .08em; text-transform: uppercase; }
+  .btn:hover { background: rgba(255,255,255,.14); }
+  .btn.on { background: rgba(150, 190, 255, .35); }
   #eyeBtn { position: fixed; top: 16px; right: 16px; z-index: 6; transition: opacity .35s; }
-  #start { position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px;
-    text-align: center; padding: 20px; background: linear-gradient(180deg, #2f6fc4 0%, #8cc4f0 55%, #f6d9e8 100%); }
-  #start h1 { font-size: 40px; letter-spacing: 3px; text-shadow: 0 4px 30px rgba(20,50,110,.4); }
-  #start p { max-width: 540px; line-height: 2; font-size: 15px; color: rgba(255,255,255,.95); text-shadow: 0 1px 8px rgba(20,50,110,.35); }
-  #startBtn { padding: 14px 34px; border: none; border-radius: 999px; font-size: 17px; cursor: pointer; color: #1d3f73; font-weight: 600;
-    background: rgba(255,255,255,.92); box-shadow: 0 10px 30px rgba(30,70,140,.3); }
+  #start { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; padding: 20px;
+    background: radial-gradient(120% 90% at 50% 0%, #2a4a7c 0%, #121a2b 55%, #0b0f18 100%); }
+  .card { width: min(560px, 100%); padding: 34px 32px; border-radius: 14px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1); }
+  .kicker { font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: rgba(255,255,255,.55); }
+  h1 { font: 400 54px/1 "Instrument Serif", serif; margin: 12px 0 18px; }
+  h1 i { color: #bcd3ff; }
+  .how { font-size: 12.5px; line-height: 2; color: rgba(255,255,255,.82); }
+  .how b { color: #fff; font-weight: 500; }
+  #startBtn { margin-top: 24px; width: 100%; padding: 14px; border: none; border-radius: 8px; font: 500 13px "IBM Plex Mono", monospace; letter-spacing: .12em; text-transform: uppercase; cursor: pointer; color: #0b0f18; background: #e8efff; }
   #startBtn:disabled { opacity: .6; cursor: wait; }
-  #err { color: #7a1030; font-size: 14px; max-width: 480px; }
+  #err { color: #ff9fb2; font-size: 12px; margin-top: 12px; }
 </style>
 </head>
 <body>
 <video id="video" playsinline muted></video>
 <canvas id="c"></canvas>
+<canvas id="gl"></canvas>
 
 <div id="status" class="pill ui"><span id="beatDot"></span><span id="statusText">Waiting for camera…</span></div>
 <div id="tools" class="ui">
-  <button class="btn" id="musicBtn" title="Listen to the music in the room with the microphone and pulse with the beat">🎵 Music sync</button>
-  <button class="btn" id="recBtn" title="Record">⏺ Record</button>
+  <button class="btn" id="musicBtn" title="Listen to the music in the room with the microphone and pulse with the beat">Music sync</button>
+  <button class="btn" id="recBtn">● Rec</button>
   <button class="btn" id="fsBtn" title="Fullscreen">⛶</button>
 </div>
 <button class="btn" id="eyeBtn" title="Hide the interface (or press H)">👁</button>
 
 <div id="start">
-  <h1>☁️ Dreamscape ☁️</h1>
-  <p>☝️ Point one finger (or tap the screen) — a water drop ripples across the glass<br>
-     🖐 Raise an open palm — blue sky, and the birds circle your hand<br>
-     🤲 Hold your hands flat, palms down — a wireframe mountain world rises under them<br>
-     ✊✊ Raise two fists — a blue glow with rays of light<br>
-     🙌 Lift both hands beside your head — you turn into a white silhouette and vanish<br>
-     😌 Close your eyes — misty blue wings<br>
-     🎵 Music sync — everything pulses with the beat</p>
-  <button id="startBtn">Turn on camera</button>
-  <div id="err"></div>
+  <div class="card">
+    <div class="kicker">AR · Daydream</div>
+    <h1>Dream<i>scape</i></h1>
+    <div class="how">
+      <b>☝️ Point one finger</b> (or tap the screen) — a drop of water on the glass<br>
+      <b>🖐 Raise an open palm</b> — a blue sky, and the doves circle your hand<br>
+      <b>🤲 Hands flat, palms down</b> — a wireframe mountain world rises under them<br>
+      <b>✊✊ Two fists</b> — a blue glow with rays of light<br>
+      <b>🙌 Both hands up beside your head</b> — you turn to light and vanish<br>
+      <b>😌 Close your eyes</b> — everything drifts into a soft dream<br>
+      <b>Music sync</b> — everything pulses with the beat
+    </div>
+    <button id="startBtn">Turn on camera</button>
+    <div id="err"></div>
+  </div>
 </div>
 
 <script type="module">
-import { FilesetResolver, HandLandmarker, FaceLandmarker, PoseLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs";
+import { FilesetResolver, HandLandmarker, FaceLandmarker, ImageSegmenter, PoseLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs";
 const WASM = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm";
 const HAND_MODEL = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
 const FACE_MODEL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
+const SEG_MODEL = "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter_landscape/float16/latest/selfie_segmenter_landscape.tflite";
 const POSE_MODEL = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
 
 const $ = id => document.getElementById(id);
-const canvas = $('c'), ctx = canvas.getContext('2d');
+const canvas = $('c'), ctx = canvas.getContext('2d'), glc = $('gl');
 const video = $('video');
 let W = 0, H = 0; const DPR = Math.min(window.devicePixelRatio || 1, 2);
-const snapC = document.createElement('canvas'), scx = snapC.getContext('2d');
-function resize() { W = innerWidth; H = innerHeight; canvas.width = W * DPR; canvas.height = H * DPR; ctx.setTransform(DPR, 0, 0, DPR, 0, 0); snapC.width = canvas.width; snapC.height = canvas.height; }
+function resize() { W = innerWidth; H = innerHeight; canvas.width = glc.width = Math.round(W * DPR); canvas.height = glc.height = Math.round(H * DPR); ctx.setTransform(DPR, 0, 0, DPR, 0, 0); }
 addEventListener('resize', resize); resize();
 
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -79,13 +90,15 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, k) => a + (b - a) * k;
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const ease = (dt, rate) => 1 - Math.exp(-dt * rate);
+const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 
 /* ---------- UI ---------- */
 $('eyeBtn').onclick = () => document.body.classList.toggle('hide-ui');
 $('fsBtn').onclick = () => { try { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); } catch (e) { } };
 addEventListener('keydown', e => { if (e.key === 'h' || e.key === 'H') document.body.classList.toggle('hide-ui'); });
-// tap / click the screen → a water drop
-canvas.addEventListener('pointerdown', e => addRipple(e.clientX, e.clientY, 1));
+for (const el of [glc, canvas]) el.addEventListener('pointerdown', e => addRipple(e.clientX, e.clientY, 1));
+let statusMsg = '', statusAt = 0;
+function say(msg) { if (msg !== statusMsg || performance.now() - statusAt > 1200) { statusMsg = msg; statusAt = performance.now(); $('statusText').textContent = msg; } }
 
 /* ---------- Camera → screen mapping (cover fit, mirrored) ---------- */
 let vw = 1280, vh = 720;
@@ -93,7 +106,7 @@ function cover() { const s = Math.max(W / vw, H / vh); const dw = vw * s, dh = v
 function toScreen(lm) { const c = cover(); return { x: W - (c.ox + lm.x * c.dw), y: c.oy + lm.y * c.dh }; }
 function drawMirrored(img, filter) { const c = cover(); ctx.save(); if (filter) ctx.filter = filter; ctx.translate(W, 0); ctx.scale(-1, 1); ctx.drawImage(img, c.ox, c.oy, c.dw, c.dh); ctx.restore(); }
 
-/* ---------- Beat detection from the microphone ---------- */
+/* ---------- Beat ---------- */
 let audioCtx = null, analyser = null, freq = null, micStream = null, beatAvg = 0, lastBeat = 0, beat = 0;
 $('musicBtn').onclick = async () => {
   if (analyser) { micStream.getTracks().forEach(t => t.stop()); audioCtx.close(); analyser = null; micStream = null; $('musicBtn').classList.remove('on'); return; }
@@ -104,105 +117,193 @@ $('musicBtn').onclick = async () => {
     analyser = audioCtx.createAnalyser(); analyser.fftSize = 1024; analyser.smoothingTimeConstant = 0.2;
     src.connect(analyser); freq = new Uint8Array(analyser.frequencyBinCount);
     $('musicBtn').classList.add('on');
-  } catch (e) { console.error(e); $('musicBtn').textContent = '🎵 Mic blocked'; }
+  } catch (e) { $('musicBtn').textContent = 'Mic blocked'; }
 };
 function updateBeat(now) {
-  beat *= 0.9;
-  if (!analyser) return;
+  beat *= 0.9; if (!analyser) return;
   analyser.getByteFrequencyData(freq);
   let e = 0; for (let i = 1; i < 8; i++) e += freq[i]; e /= 7;
   beatAvg = beatAvg * 0.95 + e * 0.05;
-  if (e > beatAvg * 1.25 && e > 60 && now - lastBeat > 280) { lastBeat = now; beat = 1; onBeat(); }
+  if (e > beatAvg * 1.25 && e > 60 && now - lastBeat > 280) { lastBeat = now; beat = 1; for (const h of hands) if (h.open) glint(h.c.x, h.c.y, 6, 30); }
 }
 
-/* ---------- 💧 Water ripples: a drop on the glass that bends the picture underneath ---------- */
-const ripples = [];
-function addRipple(x, y, power = 1) { if (ripples.length < 8) ripples.push({ x, y, born: performance.now(), p: power, R: Math.min(W, H) * rand(0.16, 0.22) * power }); spark(x, y, 6, 8); }
-function drawRipples(now) {
-  if (!ripples.length) return;
-  scx.setTransform(1, 0, 0, 1, 0, 0); scx.clearRect(0, 0, snapC.width, snapC.height); scx.drawImage(canvas, 0, 0);
-  for (let i = ripples.length - 1; i >= 0; i--) {
-    const r = ripples[i], age = (now - r.born) / 1000, life = 2.2;
-    if (age > life) { ripples.splice(i, 1); continue; }
-    const fade = 1 - age / life, front = r.R * (0.15 + age * 0.75);
-    // rings of glass, each one bulging (magnifying) or dipping (shrinking) the picture a little
-    const N = 7, band = Math.max(5, r.R * 0.075);
-    for (let k = 0; k < N; k++) {
-      const outer = front - k * band, inner = outer - band; if (inner <= 1) break;
-      const amp = 0.13 * fade * (1 - k / N) * r.p, sc = 1 + amp * Math.sin(k * 1.9 + age * 6);
-      ctx.save(); ctx.beginPath(); ctx.arc(r.x, r.y, outer, 0, Math.PI * 2); ctx.arc(r.x, r.y, inner, 0, Math.PI * 2, true); ctx.clip();
-      ctx.translate(r.x, r.y); ctx.scale(sc, sc); ctx.translate(-r.x, -r.y);
-      ctx.drawImage(snapC, 0, 0, snapC.width, snapC.height, 0, 0, W, H);
-      ctx.restore();
-      // highlight on the top-left of each ring, shadow on the bottom-right
-      ctx.save(); ctx.lineWidth = Math.max(0.8, band * 0.22);
-      ctx.strokeStyle = `rgba(255,255,255,${0.85 * fade * (1 - k / N)})`; ctx.beginPath(); ctx.arc(r.x, r.y, outer - band * 0.3, Math.PI * 0.95, Math.PI * 1.75); ctx.stroke();
-      ctx.strokeStyle = `rgba(20,40,60,${0.35 * fade * (1 - k / N)})`; ctx.beginPath(); ctx.arc(r.x, r.y, outer - band * 0.6, Math.PI * -0.05, Math.PI * 0.75); ctx.stroke();
-      ctx.restore();
-    }
-    // the drop itself: a little glassy bead at the centre for the first moment
-    if (age < 0.6) {
-      const k = 1 - age / 0.6, br = r.R * 0.09 * k;
-      ctx.save(); ctx.beginPath(); ctx.arc(r.x, r.y, br, 0, Math.PI * 2); ctx.clip();
-      ctx.translate(r.x, r.y); ctx.scale(1.35, 1.35); ctx.translate(-r.x, -r.y); ctx.drawImage(snapC, 0, 0, snapC.width, snapC.height, 0, 0, W, H); ctx.restore();
-      ctx.save(); ctx.strokeStyle = `rgba(255,255,255,${0.8 * k})`; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(r.x, r.y, br, 0, Math.PI * 2); ctx.stroke();
-      ctx.fillStyle = `rgba(255,255,255,${0.9 * k})`; ctx.beginPath(); ctx.arc(r.x - br * 0.35, r.y - br * 0.35, br * 0.22, 0, Math.PI * 2); ctx.fill(); ctx.restore();
-    }
+/* ---------- 💧 WebGL layer: shows the 2D scene and bends it where water drops land ---------- */
+const MAXR = 8, ripples = [];
+let gl = null, glProg = null, glTex = null, uRes, uN, uRip;
+function initGL() {
+  try {
+    gl = glc.getContext('webgl', { premultipliedAlpha: false, antialias: false, preserveDrawingBuffer: true });
+    if (!gl) throw 0;
+    const vs = `attribute vec2 a; varying vec2 v; void main(){ v = a * 0.5 + 0.5; gl_Position = vec4(a, 0., 1.); }`;
+    const fs = `precision mediump float;
+      varying vec2 v; uniform sampler2D tex; uniform vec2 res; uniform int n; uniform vec4 rip[${MAXR}];
+      void main(){
+        vec2 p = vec2(v.x, 1.0 - v.y) * res;          // pixel position, y down
+        vec2 off = vec2(0.0); float hi = 0.0; float sh = 0.0;
+        for (int i = 0; i < ${MAXR}; i++) {
+          if (i >= n) break;
+          vec4 r = rip[i]; vec2 d = p - r.xy; float dd = length(d); float age = r.z; float R = r.w;
+          vec2 dir = dd > 0.5 ? d / dd : vec2(0.0);
+          float front = R * (0.12 + age * 0.7), wdt = R * (0.2 + age * 0.12);
+          float x = (dd - front) / wdt, env = exp(-x * x) * exp(-age * 0.95);
+          float wave = sin((dd - front) / (R * 0.07)) * env;
+          off += dir * wave * R * 0.12;
+          float lit = dot(dir, normalize(vec2(-0.55, -0.83)));
+          hi += max(0.0, lit) * max(0.0, wave) * env;
+          sh += max(0.0, -lit) * max(0.0, wave) * env;
+          float lens = exp(-dd * dd / (R * R * 0.04)) * exp(-age * 2.5);
+          off -= d * lens * 0.35;
+          hi += lens * smoothstep(0.75, 1.0, dot(-dir, normalize(vec2(0.55, 0.83)))) * 0.6;
+        }
+        vec2 uv = (p + off) / res;
+        vec4 col = texture2D(tex, uv);                 // canvas rows are uploaded top-first, so uv (y down) maps straight on
+        col.rgb += hi * 0.6 - sh * 0.18;
+        gl_FragColor = vec4(col.rgb, 1.0);
+      }`;
+    const mk = (t, s) => { const o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o); if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) throw gl.getShaderInfoLog(o); return o; };
+    glProg = gl.createProgram(); gl.attachShader(glProg, mk(gl.VERTEX_SHADER, vs)); gl.attachShader(glProg, mk(gl.FRAGMENT_SHADER, fs)); gl.linkProgram(glProg);
+    if (!gl.getProgramParameter(glProg, gl.LINK_STATUS)) throw gl.getProgramInfoLog(glProg);
+    gl.useProgram(glProg);
+    const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(glProg, 'a'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    glTex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, glTex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    uRes = gl.getUniformLocation(glProg, 'res'); uN = gl.getUniformLocation(glProg, 'n'); uRip = gl.getUniformLocation(glProg, 'rip');
+  } catch (e) { console.warn('WebGL unavailable, water drops will be simpler', e); gl = null; document.body.classList.add('no-gl'); }
+}
+initGL();
+const drops = [];
+function addRipple(x, y, power = 1) {
+  if (ripples.length >= MAXR) ripples.shift();
+  ripples.push({ x, y, born: performance.now(), R: Math.min(W, H) * rand(0.2, 0.26) * power });
+  for (let i = 0; i < 9; i++) { const a = rand(0, Math.PI * 2), d = rand(0.15, 0.6) * Math.min(W, H) * 0.12; drops.push({ x: x + Math.cos(a) * d, y: y + Math.sin(a) * d, r: rand(1.5, 4.5), born: performance.now(), life: rand(1.2, 2.2) }); }
+}
+function drawDrops(now) {
+  for (let i = drops.length - 1; i >= 0; i--) {
+    const d = drops[i], age = (now - d.born) / 1000; if (age > d.life) { drops.splice(i, 1); continue; }
+    const a = (1 - age / d.life) * Math.min(1, age * 10), r = d.r;
+    ctx.save(); ctx.globalAlpha = a;
+    const g = ctx.createRadialGradient(d.x - r * 0.3, d.y - r * 0.35, 0, d.x, d.y, r);
+    g.addColorStop(0, 'rgba(255,255,255,0.95)'); g.addColorStop(0.35, 'rgba(255,255,255,0.25)'); g.addColorStop(0.8, 'rgba(255,255,255,0.05)'); g.addColorStop(1, 'rgba(40,60,80,0.25)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(d.x, d.y, r, 0, Math.PI * 2); ctx.fill(); ctx.restore();
   }
 }
+function present(now) {
+  for (let i = ripples.length - 1; i >= 0; i--) if ((now - ripples[i].born) / 1000 > 3) ripples.splice(i, 1);
+  if (!gl) return;
+  gl.viewport(0, 0, glc.width, glc.height);
+  gl.bindTexture(gl.TEXTURE_2D, glTex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
+  const arr = new Float32Array(MAXR * 4);
+  ripples.forEach((r, i) => { arr[i * 4] = r.x * DPR; arr[i * 4 + 1] = r.y * DPR; arr[i * 4 + 2] = (now - r.born) / 1000; arr[i * 4 + 3] = r.R * DPR; });
+  gl.uniform2f(uRes, glc.width, glc.height); gl.uniform1i(uN, ripples.length); gl.uniform4fv(uRip, arr);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+}
 
-/* ---------- Scenes ---------- */
-// room (your real room) is the default; the others fade in while you hold their gesture
-const scene = { sky: 0, wire: 0, aura: 0 };
-const sceneUntil = { sky: 0, wire: 0, aura: 0 };
-const clouds = Array.from({ length: 7 }, () => ({ x: rand(0, 1), y: rand(0.06, 0.5), s: rand(0.6, 1.5), v: rand(0.004, 0.012) }));
+/* ---------- ☁️ Sky: soft, photographic clouds (fbm noise, pre-rendered once) ---------- */
+let skyTex = null;
+function makeSky() {
+  const w = 768, h = 432, c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
+  const img = g.createImageData(w, h), d = img.data;
+  const P = 64, perm = new Uint8Array(P * P); for (let i = 0; i < perm.length; i++) perm[i] = (Math.random() * 256) | 0;
+  const val = (x, y) => perm[((y % P + P) % P) * P + ((x % P + P) % P)] / 255;
+  const noise = (x, y, per) => { const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi, u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+    const a = val(xi % per, yi), b = val((xi + 1) % per, yi), cc = val(xi % per, yi + 1), dd = val((xi + 1) % per, yi + 1);
+    return lerp(lerp(a, b, u), lerp(cc, dd, u), v); };
+  const fbm = (x, y) => { let s = 0, a = 0.5, f = 1; for (let o = 0; o < 6; o++) { s += a * noise(x * f, y * f, 8 * f); a *= 0.5; f *= 2; } return s; };
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const u = x / w * 8, v = y / h * 4.5;
+    const n = fbm(u, v), n2 = fbm(u + 3.1, v + 1.7);
+    const fy = y / h, density = smooth(0.45 + fy * 0.12, 0.78, n * 0.8 + n2 * 0.35) * (0.35 + 0.65 * (1 - Math.abs(fy - 0.4) * 1.2));
+    const shade = smooth(0.4, 0.9, n2);
+    const sr = lerp(52, 150, fy), sg = lerp(104, 190, fy), sb = lerp(214, 240, fy);
+    const cr = lerp(255, 196, shade * 0.6), cg = lerp(255, 210, shade * 0.6), cb = lerp(255, 236, shade * 0.6);
+    const i = (y * w + x) * 4; d[i] = lerp(sr, cr, density); d[i + 1] = lerp(sg, cg, density); d[i + 2] = lerp(sb, cb, density); d[i + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  return c;
+}
 function drawSky(t, a) {
+  if (!skyTex) skyTex = makeSky();
   ctx.save(); ctx.globalAlpha = a;
-  const g = ctx.createLinearGradient(0, 0, 0, H);
-  g.addColorStop(0, '#3d6fd8'); g.addColorStop(0.5, '#6f9ef0'); g.addColorStop(1, '#a9c8f5');
-  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-  for (const c of clouds) {
-    c.x += c.v / 60; if (c.x > 1.3) c.x = -0.3;
-    const cx = c.x * W, cy = c.y * H, r = 70 * c.s * Math.min(1.6, W / 900);
-    ctx.save(); ctx.globalAlpha = a * 0.5; ctx.fillStyle = '#ffffff'; ctx.filter = 'blur(14px)';
-    for (const [dx, dy, rr] of [[0, 0, 1], [0.9, 0.15, 0.8], [-0.9, 0.2, 0.75], [0.4, -0.35, 0.7], [-0.4, -0.3, 0.65]]) {
-      ctx.beginPath(); ctx.ellipse(cx + dx * r, cy + dy * r, rr * r, rr * r * 0.55, 0, 0, Math.PI * 2); ctx.fill();
-    }
-    ctx.restore();
-  }
+  const s = Math.max(W / skyTex.width, H / skyTex.height) * 1.02, tw = skyTex.width * s, th = skyTex.height * s;
+  const off = (t * 8) % tw;
+  ctx.drawImage(skyTex, -off, (H - th) / 2, tw, th); ctx.drawImage(skyTex, tw - off - 1, (H - th) / 2, tw, th);
+  const sun = ctx.createRadialGradient(W * 0.82, H * 0.12, 0, W * 0.82, H * 0.12, Math.max(W, H) * 0.5);
+  sun.addColorStop(0, 'rgba(255,250,235,0.45)'); sun.addColorStop(1, 'rgba(255,250,235,0)'); ctx.fillStyle = sun; ctx.fillRect(0, 0, W, H);
   ctx.restore();
 }
-// wireframe mountains: a perspective mesh whose peaks rise under your hands
-function terrainH(x, z, t) {
+
+/* ---------- 🕊 Doves: a flock with depth that circles your open palm ---------- */
+const birds = Array.from({ length: 26 }, () => ({ x: rand(0, 1) * innerWidth, y: rand(0.05, 0.7) * innerHeight, vx: rand(1, 3) * (Math.random() < 0.5 ? -1 : 1), vy: rand(-0.5, 0.5), z: rand(0.55, 1.6), ph: rand(0, 6.28), dir: Math.random() < 0.5 ? -1 : 1, ring: rand(0.7, 1.5) }));
+function updateBirds(dt, targets) {
+  const f = dt * 60;
+  for (const b of birds) {
+    if (targets.length) {
+      let best = targets[0]; for (const p of targets) if (dist(p, b) < dist(best, b)) best = p;
+      const dx = best.x - b.x, dy = best.y - b.y, d = Math.hypot(dx, dy) || 1, R = best.r * b.ring;
+      const pull = clamp((d - R) / R, -1, 1), sp = (4 + 2 * b.z) * (1 + beat * 0.4);
+      const tx = dx / d * pull * sp - dy / d * sp * 0.9 * b.dir, ty = dy / d * pull * sp + dx / d * sp * 0.9 * b.dir * 0.6;
+      b.vx += (tx - b.vx) * 0.06 * f; b.vy += (ty - b.vy) * 0.06 * f;
+    } else { b.vx += ((b.dir * 2.4 * b.z) - b.vx) * 0.02 * f; b.vy += (Math.sin(b.ph * 0.02) * 0.5 - b.vy) * 0.02 * f; }
+    for (const o of birds) { if (o === b) continue; const dx = b.x - o.x, dy = b.y - o.y, d2 = dx * dx + dy * dy; if (d2 < 900) { b.vx += dx / (d2 + 1) * 2.5; b.vy += dy / (d2 + 1) * 2.5; } }
+    b.x += b.vx * f; b.y += b.vy * f; b.ph += (0.22 + 0.06 / b.z + beat * 0.3) * f;
+    const m = 90; if (b.x < -m) b.x = W + m; if (b.x > W + m) b.x = -m; if (b.y < -m) b.y = H * 0.6; if (b.y > H + m) b.y = -m;
+  }
+}
+function drawBird(b) {
+  const s = 15 * b.z * Math.min(1.6, Math.max(0.8, W / 1000)), flap = Math.sin(b.ph), dirx = b.vx >= 0 ? 1 : -1;
+  ctx.save(); ctx.translate(b.x, b.y); ctx.scale(dirx, 1); ctx.rotate(clamp(b.vy * 0.06, -0.5, 0.5) * dirx);
+  ctx.globalAlpha *= clamp(0.55 + b.z * 0.35, 0, 1);
+  const wingY = -flap * s * 0.9, tipX = s * (1.25 - Math.abs(flap) * 0.25);
+  const g = ctx.createLinearGradient(0, -s, 0, s * 0.6); g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#c9d6ea');
+  ctx.beginPath(); ctx.moveTo(-s * 0.1, -s * 0.05); ctx.quadraticCurveTo(-s * 0.2, wingY * 0.8 - s * 0.2, -tipX * 0.55, wingY * 0.9); ctx.quadraticCurveTo(-s * 0.1, wingY * 0.3, s * 0.15, 0); ctx.closePath();
+  ctx.fillStyle = 'rgba(190,205,228,0.95)'; ctx.fill();                                                                       // far wing
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.ellipse(0, 0, s * 0.55, s * 0.16, -0.08, 0, Math.PI * 2); ctx.fill();                                   // body
+  ctx.beginPath(); ctx.moveTo(s * 0.5, -s * 0.06); ctx.quadraticCurveTo(s * 0.72, -s * 0.12, s * 0.74, -s * 0.02); ctx.quadraticCurveTo(s * 0.62, s * 0.06, s * 0.45, s * 0.05); ctx.fill();   // head
+  ctx.beginPath(); ctx.moveTo(-s * 0.5, 0); ctx.lineTo(-s * 0.78, -s * 0.1); ctx.lineTo(-s * 0.74, s * 0.1); ctx.closePath(); ctx.fill();   // tail
+  ctx.beginPath(); ctx.moveTo(-s * 0.05, -s * 0.08); ctx.quadraticCurveTo(s * 0.05, wingY - s * 0.15, tipX * 0.35, wingY * 1.05); ctx.quadraticCurveTo(s * 0.15, wingY * 0.4, s * 0.3, -s * 0.02); ctx.closePath();
+  ctx.shadowColor = 'rgba(40,70,120,0.35)'; ctx.shadowBlur = 4; ctx.fill();                                                    // near wing
+  ctx.restore();
+}
+function drawBirds(a) {
+  if (a < 0.02) return;
+  ctx.save(); ctx.globalAlpha = a;
+  for (const b of [...birds].sort((p, q) => p.z - q.z)) drawBird(b);
+  ctx.restore();
+}
+
+/* ---------- 🏔 Wireframe mountains ---------- */
+let wireBumps = [];
+function terrainH(x, z) {
   let h = 0;
   const ridge = Math.sin(x * 0.55 + 1.3) * 0.55 + Math.sin(x * 1.3 + z * 0.4) * 0.3 + Math.abs(Math.sin(x * 2.9 - z * 0.9)) * 0.35;
-  h += Math.max(0, ridge) * clamp((z - 2.2) / 3, 0, 1) * 2.6;                     // a flat grid floor near you, mountains further back
+  h += Math.max(0, ridge) * clamp((z - 2.2) / 3, 0, 1) * 2.6;
   for (const b of wireBumps) { const dx = x - b.x, dz = z - b.z; h += b.h * Math.exp(-(dx * dx) / 0.35 - (dz * dz) / 3.5); }
   return h * (1 + beat * 0.15);
 }
-let wireBumps = [];
 function drawWire(t, a) {
   ctx.save(); ctx.globalAlpha = a;
-  const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#0b1633'); g.addColorStop(0.55, '#14254f'); g.addColorStop(1, '#22376a');
+  const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#0a1430'); g.addColorStop(0.55, '#14244c'); g.addColorStop(1, '#203566');
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-  for (let i = 0; i < 70; i++) { const x = (i * 137.5 % 100) / 100 * W, y = (i * 61.8 % 45) / 100 * H; ctx.fillStyle = `rgba(220,235,255,${0.3 + 0.3 * Math.sin(t * 2 + i)})`; ctx.fillRect(x, y, 1.4, 1.4); }
-  const horizon = H * 0.46, f = Math.min(W, H) * 0.9, camH = 1.25, X = 4.2, NX = 44, Z0 = 1.1, Z1 = 9, NZ = 30, scroll = (t * 0.25) % ((Z1 - Z0) / NZ);
-  const P = (x, z) => { const h = terrainH(x, z, t); return { x: W / 2 + x / z * f, y: horizon + (camH - h) / z * f }; };
-  ctx.lineWidth = 0.8; ctx.lineJoin = 'round';
-  for (let j = NZ; j >= 0; j--) {                                // rows, far → near
+  for (let i = 0; i < 80; i++) { const x = (i * 137.5 % 100) / 100 * W, y = (i * 61.8 % 45) / 100 * H; ctx.fillStyle = `rgba(220,235,255,${0.25 + 0.3 * Math.sin(t * 2 + i)})`; ctx.fillRect(x, y, 1.3, 1.3); }
+  const horizon = H * 0.46, f = Math.min(W, H) * 0.9, camH = 1.25, X = 4.2, NX = 48, Z0 = 1.1, Z1 = 9, NZ = 32, scroll = (t * 0.25) % ((Z1 - Z0) / NZ);
+  const P = (x, z) => ({ x: W / 2 + x / z * f, y: horizon + (camH - terrainH(x, z)) / z * f });
+  ctx.lineWidth = 0.7; ctx.lineJoin = 'round';
+  for (let j = NZ; j >= 0; j--) {
     const z = Z0 + j * (Z1 - Z0) / NZ - scroll, fade = clamp(1 - (z - Z0) / (Z1 - Z0), 0, 1);
-    ctx.strokeStyle = `rgba(225,238,255,${0.35 + 0.5 * fade})`; ctx.beginPath();
-    for (let i = 0; i <= NX; i++) { const x = -X + i * 2 * X / NX, q = P(x * z / 2.2, z); i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y); }
+    ctx.strokeStyle = `rgba(225,238,255,${0.3 + 0.5 * fade})`; ctx.beginPath();
+    for (let i = 0; i <= NX; i++) { const x = (-X + i * 2 * X / NX) * z / 2.2, q = P(x, z); i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y); }
     ctx.stroke();
   }
-  for (let i = 0; i <= NX; i++) {                                 // columns
-    ctx.strokeStyle = 'rgba(225,238,255,0.45)'; ctx.beginPath();
-    for (let j = 0; j <= NZ; j++) { const z = Z0 + j * (Z1 - Z0) / NZ - scroll, x = (-X + i * 2 * X / NX) * z / 2.2, q = P(x, z); j ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y); }
-    ctx.stroke();
-  }
+  ctx.strokeStyle = 'rgba(225,238,255,0.4)';
+  for (let i = 0; i <= NX; i++) { ctx.beginPath(); for (let j = 0; j <= NZ; j++) { const z = Z0 + j * (Z1 - Z0) / NZ - scroll, x = (-X + i * 2 * X / NX) * z / 2.2, q = P(x, z); j ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y); } ctx.stroke(); }
   ctx.restore();
 }
-// blue glow with rays of light
+
+/* ---------- ✨ Glow ---------- */
 function drawAura(t, a, center) {
   ctx.save(); ctx.globalAlpha = a;
   drawMirrored(video, 'blur(16px) brightness(0.95) saturate(0.4)');
@@ -215,200 +316,149 @@ function drawAura(t, a, center) {
     const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 0.7); g.addColorStop(0, 'rgba(210,228,255,0.22)'); g.addColorStop(1, 'rgba(180,205,255,0)');
     ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, R, ang - wdt, ang + wdt); ctx.closePath(); ctx.fill();
   }
-  const core = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.min(W, H) * 0.5); core.addColorStop(0, 'rgba(215,232,255,0.35)'); core.addColorStop(1, 'rgba(235,245,255,0)');
+  const core = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.min(W, H) * 0.5); core.addColorStop(0, 'rgba(215,232,255,0.35)'); core.addColorStop(1, 'rgba(215,232,255,0)');
   ctx.fillStyle = core; ctx.fillRect(0, 0, W, H);
   ctx.restore();
 }
 
-/* ---------- 🐦 Birds: they circle the open palm ---------- */
-const birds = Array.from({ length: 22 }, () => ({ x: rand(0, 1) * innerWidth, y: rand(0.1, 0.6) * innerHeight, vx: rand(-2, 2), vy: rand(-1, 1), ph: rand(0, 6.28), s: rand(0.7, 1.3), orbit: rand(0.8, 1.6) * (Math.random() < 0.5 ? -1 : 1) }));
-function updateBirds(dt, targets) {
-  const f = dt * 60;
-  for (const b of birds) {
-    let tx = b.vx, ty = b.vy;
-    if (targets.length) {
-      // pick the nearest palm, fly towards a ring around it and swirl
-      let best = targets[0]; for (const p of targets) if (dist(p, b) < dist(best, b)) best = p;
-      const dx = best.x - b.x, dy = best.y - b.y, d = Math.hypot(dx, dy) || 1, ring = best.r * b.orbit * Math.sign(b.orbit);
-      const pull = (d - Math.abs(ring)) / d;                        // >0: come closer, <0: back off to the ring
-      const sp = 5.5 * (1 + beat * 0.5);
-      tx = (dx * pull) / d * sp + (-dy / d) * sp * 0.8 * Math.sign(b.orbit);
-      ty = (dy * pull) / d * sp + (dx / d) * sp * 0.8 * Math.sign(b.orbit);
-      b.vx += (tx - b.vx) * 0.08 * f; b.vy += (ty - b.vy) * 0.08 * f;
-    } else {
-      b.vx += (Math.cos(b.ph * 0.05) * 2.2 - b.vx) * 0.02 * f; b.vy += (Math.sin(b.ph * 0.031) * 0.8 - b.vy) * 0.02 * f;
-    }
-    for (const o of birds) { if (o === b) continue; const dx = b.x - o.x, dy = b.y - o.y, d2 = dx * dx + dy * dy; if (d2 < 700) { b.vx += dx / (d2 + 1) * 3; b.vy += dy / (d2 + 1) * 3; } }
-    b.x += b.vx * f; b.y += b.vy * f; b.ph += (0.25 + beat * 0.3) * f;
-    const m = 80; if (b.x < -m) b.x = W + m; if (b.x > W + m) b.x = -m; if (b.y < -m) b.y = H + m; if (b.y > H + m) b.y = -m;
-  }
-}
-function drawBirds(a) {
+/* ---------- 😌 Dream (eyes closed): soft focus, light leaks, floating bokeh ---------- */
+let dreamAmt = 0, eyesClosedSince = 0, eyesOpenSince = 0, eyesClosed = false;
+const bokeh = Array.from({ length: 26 }, () => ({ x: rand(0, 1), y: rand(0, 1), r: rand(10, 46), vy: rand(-0.02, -0.006), ph: rand(0, 6), hue: Math.random() }));
+function drawDream(t, a) {
   if (a < 0.02) return;
-  ctx.save(); ctx.globalAlpha = a; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-  for (const b of birds) {
-    const s = 13 * b.s * Math.min(1.6, W / 900), f = Math.sin(b.ph) * 0.7, dir = Math.atan2(b.vy, b.vx);
-    ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(dir * 0.3);
-    // a little seagull: two curved wings and a body
-    ctx.beginPath();
-    ctx.moveTo(-s, -s * f * 0.9); ctx.quadraticCurveTo(-s * 0.5, -s * (0.45 + f * 0.5), 0, 0);
-    ctx.quadraticCurveTo(s * 0.5, -s * (0.45 + f * 0.5), s, -s * f * 0.9);
-    ctx.quadraticCurveTo(s * 0.45, -s * (0.2 + f * 0.3), 0, s * 0.12); ctx.quadraticCurveTo(-s * 0.45, -s * (0.2 + f * 0.3), -s, -s * f * 0.9);
-    ctx.fillStyle = 'rgba(250,252,255,0.95)'; ctx.fill(); ctx.strokeStyle = 'rgba(70,95,140,0.7)'; ctx.lineWidth = 1; ctx.stroke();
-    ctx.fillStyle = 'rgba(60,80,120,0.8)'; ctx.beginPath(); ctx.ellipse(0, s * 0.05, s * 0.09, s * 0.16, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.restore();
+  ctx.save(); ctx.globalAlpha = a * 0.85; drawMirrored(video, 'blur(9px) brightness(1.08) saturate(1.1)'); ctx.restore();
+  ctx.save(); ctx.globalCompositeOperation = 'screen';
+  const lk = ctx.createRadialGradient(W * 0.1, H * 0.15, 0, W * 0.1, H * 0.15, Math.max(W, H) * 0.6); lk.addColorStop(0, `rgba(255,190,220,${0.35 * a})`); lk.addColorStop(1, 'rgba(255,190,220,0)');
+  ctx.fillStyle = lk; ctx.fillRect(0, 0, W, H);
+  const lk2 = ctx.createRadialGradient(W * 0.92, H * 0.85, 0, W * 0.92, H * 0.85, Math.max(W, H) * 0.55); lk2.addColorStop(0, `rgba(170,200,255,${0.3 * a})`); lk2.addColorStop(1, 'rgba(170,200,255,0)');
+  ctx.fillStyle = lk2; ctx.fillRect(0, 0, W, H);
+  for (const b of bokeh) {
+    b.y += b.vy / 60; if (b.y < -0.1) { b.y = 1.1; b.x = rand(0, 1); }
+    const x = b.x * W + Math.sin(t * 0.4 + b.ph) * 20, y = b.y * H, r = b.r * (1 + beat * 0.2);
+    const col = b.hue < 0.5 ? '255,220,240' : '210,225,255';
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, `rgba(${col},${0.22 * a})`); g.addColorStop(0.7, `rgba(${col},${0.12 * a})`); g.addColorStop(1, `rgba(${col},0)`);
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
   }
   ctx.restore();
 }
 
-/* ---------- Wings (appear while your eyes are closed) ---------- */
-let wingAmt = 0, eyesClosedSince = 0, eyesOpenSince = 0, eyesClosed = false;
-function drawWing(sh, side, sw, t) {
-  const amt = wingAmt; if (amt < 0.01) return;
-  const flap = Math.sin(t * 2.2) * 0.08 + beat * 0.15;
-  ctx.save(); ctx.translate(sh.x, sh.y); ctx.scale(side, 1);
-  const rows = [{ n: 8, len: 1.45, w: 0.16, a0: -0.25, step: 0.17, col: [118, 160, 230], alpha: 0.42 },
-                { n: 6, len: 0.85, w: 0.14, a0: -0.45, step: 0.2, col: [165, 198, 245], alpha: 0.5 }];
-  for (const R of rows) {
-    for (let i = 0; i < R.n; i++) {
-      const a = R.a0 - i * R.step - flap * (1 - i / (R.n + 2));
-      const len = sw * (R.len - i * 0.055) * amt, wd = sw * R.w * amt;
-      ctx.save(); ctx.rotate(a);
-      const [r, g, b] = R.col;
-      const gr = ctx.createLinearGradient(0, 0, len, 0);
-      gr.addColorStop(0, `rgba(${r},${g},${b},${R.alpha * amt})`);
-      gr.addColorStop(0.7, `rgba(${r + 30},${g + 25},${b + 10},${R.alpha * 0.8 * amt})`);
-      gr.addColorStop(1, `rgba(225,238,255,${0.15 * amt})`);
-      ctx.beginPath(); ctx.moveTo(0, 0);
-      ctx.bezierCurveTo(len * 0.3, -wd, len * 0.8, -wd * 0.9, len, 0);
-      ctx.bezierCurveTo(len * 0.8, wd * 0.6, len * 0.3, wd * 0.7, 0, 0);
-      ctx.fillStyle = gr; ctx.shadowColor = 'rgba(150,190,255,0.6)'; ctx.shadowBlur = 10; ctx.fill();
-      ctx.shadowBlur = 0; ctx.strokeStyle = `rgba(240,247,255,${0.55 * amt})`; ctx.lineWidth = 1; ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(len * 0.05, 0); ctx.lineTo(len * 0.92, -wd * 0.05);
-      ctx.strokeStyle = `rgba(245,250,255,${0.35 * amt})`; ctx.stroke();
-      ctx.restore();
-    }
-  }
-  ctx.restore();
-}
-
-/* ---------- Sparkles ---------- */
-const sparks = [];
-function spark(x, y, n, spread) { for (let i = 0; i < n && sparks.length < 300; i++) sparks.push({ x: x + rand(-spread, spread), y: y + rand(-spread, spread), vx: rand(-0.6, 0.6), vy: rand(-1.4, -0.2), r: rand(1, 3), life: 1 }); }
-function drawSparks() {
+/* ---------- Glints (small sparkles) ---------- */
+const glints = [];
+function glint(x, y, n, spread) { for (let i = 0; i < n && glints.length < 400; i++) glints.push({ x: x + rand(-spread, spread), y: y + rand(-spread, spread), vx: rand(-0.4, 0.4), vy: rand(-1, -0.2), r: rand(1.5, 3.5), life: 1, d: rand(0.015, 0.03) }); }
+function drawGlints() {
   ctx.save(); ctx.globalCompositeOperation = 'lighter';
-  for (const p of sparks) { p.x += p.vx; p.y += p.vy; p.life -= 0.02; ctx.globalAlpha = Math.max(0, p.life); ctx.fillStyle = '#eaf4ff'; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill(); }
+  for (const p of glints) {
+    p.x += p.vx; p.y += p.vy; p.life -= p.d; const a = Math.max(0, p.life), r = p.r;
+    ctx.fillStyle = `rgba(255,255,255,${a})`; ctx.beginPath(); ctx.moveTo(p.x, p.y - r * 2); ctx.quadraticCurveTo(p.x, p.y, p.x + r * 2, p.y); ctx.quadraticCurveTo(p.x, p.y, p.x, p.y + r * 2); ctx.quadraticCurveTo(p.x, p.y, p.x - r * 2, p.y); ctx.quadraticCurveTo(p.x, p.y, p.x, p.y - r * 2); ctx.fill();
+  }
   ctx.restore();
-  for (let i = sparks.length - 1; i >= 0; i--) if (sparks[i].life <= 0) sparks.splice(i, 1);
+  for (let i = glints.length - 1; i >= 0; i--) if (glints[i].life <= 0) glints.splice(i, 1);
 }
-function onBeat() { for (const h of hands) if (h.open) spark(h.c.x, h.c.y, 8, 30); }
 
 /* ---------- Hands ---------- */
-let statusMsg = '', statusAt = 0;
-function say(msg) { if (msg !== statusMsg || performance.now() - statusAt > 1200) { statusMsg = msg; statusAt = performance.now(); $('statusText').textContent = msg; } }
+const BONES = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
 function analyzeHand(lms, wl) {
   const p = lms.map(toScreen);
   const w = wl && wl.length === 21 ? wl : null;
   const d3 = (a, b) => w ? Math.hypot(w[a].x - w[b].x, w[a].y - w[b].y, w[a].z - w[b].z) : dist(p[a], p[b]);
   const r = (t, q) => d3(t, 0) / (d3(q, 0) || 1);
   const rr = [r(8, 6), r(12, 10), r(16, 14), r(20, 18)], ext = rr.map(v => v > 1.12);
-  const n = ext.filter(Boolean).length, open = n >= 4;
+  const open = ext.filter(Boolean).length >= 4 && d3(4, 8) / (d3(0, 9) || 1) > 0.38;
   const point = ext[0] && !ext[1] && !ext[2] && !ext[3];
   const fist = rr.every(v => v < 1.0);
   const c = { x: (p[0].x + p[5].x + p[9].x + p[13].x + p[17].x) / 5, y: (p[0].y + p[5].y + p[9].y + p[13].y + p[17].y) / 5 };
   const dx = p[9].x - p[0].x, dy = p[9].y - p[0].y;
-  const up = open && dy < -Math.abs(dx) * 0.9;                   // fingers pointing up
-  const flat = open && Math.abs(dy) < Math.abs(dx) * 0.85;        // fingers pointing sideways: a flat hand
+  const up = open && dy < -Math.abs(dx) * 0.9;
+  const flat = open && Math.abs(dy) < Math.abs(dx) * 0.85;
   return { p, open, point, fist, up, flat, c, size: dist(p[0], p[9]) };
 }
+function drawHandLines() {
+  ctx.save(); ctx.lineWidth = 0.8; ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  for (const h of hands) {
+    ctx.beginPath(); for (const [a, b] of BONES) { ctx.moveTo(h.p[a].x, h.p[a].y); ctx.lineTo(h.p[b].x, h.p[b].y); } ctx.stroke();
+    for (const q of h.p) { ctx.beginPath(); ctx.arc(q.x, q.y, 1.6, 0, Math.PI * 2); ctx.fill(); }
+  }
+  ctx.restore();
+}
 
-/* ---------- Gesture → scenes ---------- */
+/* ---------- Gestures → scenes ---------- */
+const scene = { sky: 0, wire: 0, aura: 0 }, sceneUntil = { sky: 0, wire: 0, aura: 0 };
 let lastTip = null, lastDropAt = 0, holdFlat = 0, holdUp = 0, holdFist = 0, holdVanish = 0;
-const vanish = { t0: -1e9 };
+const vanish = { t0: -1e9, parts: [] };
 function updateGestures(hands, now, dt) {
-  const vanishing = now - vanish.t0 < 4600;
-  // ☝️ a drop of water wherever you point (a new one when the finger moves on, or every ~0.9 s)
+  const vanishing = now - vanish.t0 < 5200;
   const pt = hands.find(h => h.point);
   if (pt) {
     const tip = pt.p[8];
-    if (!lastTip || now - lastDropAt > 900 || dist(tip, lastTip) > pt.size * 0.9) { addRipple(tip.x, tip.y, 1); lastDropAt = now; lastTip = { x: tip.x, y: tip.y }; say('💧 Ripples'); }
+    if (!lastTip || now - lastDropAt > 1100 || dist(tip, lastTip) > pt.size * 1.1) { addRipple(tip.x, tip.y, 1); lastDropAt = now; lastTip = { x: tip.x, y: tip.y }; say('Water drop'); }
   } else lastTip = null;
   const ups = hands.filter(h => h.up), flats = hands.filter(h => h.flat), fists = hands.filter(h => h.fist);
-  // 🙌 both hands raised beside your head → vanish (checked first)
   const headY = faceBox ? faceBox.chin.y : H * 0.45;
   const handsHigh = ups.length === 2 && ups.every(h => h.p[0].y < headY + (faceBox ? faceBox.h * 0.2 : 0)) && dist(ups[0].c, ups[1].c) > (faceBox ? faceBox.w * 1.8 : W * 0.25);
   holdVanish = handsHigh ? holdVanish + dt : 0;
-  if (holdVanish > 0.5 && !vanishing && now - vanish.t0 > 6000 && haveMask) { vanish.t0 = now; say('🫥 Vanishing…'); }
-  // 🤲 flat hands → wireframe mountains, peaks under your hands
+  if (holdVanish > 0.5 && !vanishing && now - vanish.t0 > 6500 && haveMask) startVanish(now);
   holdFlat = flats.length ? holdFlat + dt : 0;
   if (holdFlat > 0.25) {
-    sceneUntil.wire = now + 2500; say('🏔 Lift your hands to raise the mountains');
-    wireBumps = flats.map(h => {
-      const z = 3.2;   // screen x → world x at depth z
-      return { x: (h.c.x - W / 2) / (Math.min(W, H) * 0.9) * z, z, h: clamp((H * 0.95 - h.c.y) / H, 0, 1) * 2.4 };
-    });
+    sceneUntil.wire = now + 2500; say('Lift your hands — raise the mountains');
+    wireBumps = flats.map(h => { const z = 3.2; return { x: (h.c.x - W / 2) / (Math.min(W, H) * 0.9) * z, z, h: clamp((H * 0.95 - h.c.y) / H, 0, 1) * 2.4 }; });
   }
-  // 🖐 open palm raised (not the vanish pose) → blue sky and birds
-  holdUp = ups.length && !handsHigh ? holdUp + dt : (ups.length ? holdUp : 0);
-  if (holdUp > 0.2 && !vanishing) { sceneUntil.sky = now + 3500; if (!handsHigh) say('🐦 The birds follow your hand'); }
-  // ✊✊ two fists → blue glow
+  holdUp = ups.length && !handsHigh ? holdUp + dt : 0;
+  if (holdUp > 0.2 && !vanishing) { sceneUntil.sky = now + 3500; say('The doves follow your hand'); }
   holdFist = fists.length === 2 ? holdFist + dt : 0;
-  if (holdFist > 0.3) { sceneUntil.aura = now + 2500; say('✨ Glow'); }
-  // fade scenes; only the newest one stays fully on
+  if (holdFist > 0.3) { sceneUntil.aura = now + 2500; say('Glow'); }
   const order = Object.keys(scene).sort((a, b) => sceneUntil[b] - sceneUntil[a]);
-  for (const k of Object.keys(scene)) {
-    const on = !vanishing && now < sceneUntil[k] && k === order[0];
-    scene[k] = lerp(scene[k], on ? 1 : 0, ease(dt, on ? 3 : 1.6));
-  }
+  for (const k of Object.keys(scene)) { const on = !vanishing && now < sceneUntil[k] && k === order[0]; scene[k] = lerp(scene[k], on ? 1 : 0, ease(dt, on ? 3 : 1.6)); }
 }
 
 /* ---------- MediaPipe ---------- */
-let fileset, handLM, faceLM, poseLM;
-let hands = [], shoulders = null, faceBox = null, frameN = 0, lastVT = -1;
-const poseIn = document.createElement('canvas'), pix = poseIn.getContext('2d', { willReadFrequently: true });
+let fileset, handLM, faceLM, segmenter = null, poseLM = null;
+let hands = [], faceBox = null, frameN = 0, lastVT = -1;
+const segIn = document.createElement('canvas'), sgx = segIn.getContext('2d', { willReadFrequently: true });
 const maskC = document.createElement('canvas'), mcx = maskC.getContext('2d');
 const personC = document.createElement('canvas'), pcx = personC.getContext('2d');
-const plateC = document.createElement('canvas'), plx = plateC.getContext('2d');   // your room without you (built up while you move)
-const tmpC = document.createElement('canvas'), tcx = tmpC.getContext('2d');
-let haveMask = false, maskImg = null, plateReady = 0;
+const bgC = document.createElement('canvas'), bgx = bgC.getContext('2d');          // the room with you cut out (holes)
+const fillC = document.createElement('canvas'), fcx = fillC.getContext('2d');      // the room with the holes filled in
+const seenC = document.createElement('canvas'), snx = seenC.getContext('2d');      // real background seen over time
+const lvlC = document.createElement('canvas'), lvx = lvlC.getContext('2d');
+const tmpL = document.createElement('canvas'), tlx = tmpL.getContext('2d');
+let haveMask = false, maskImg = null;
 
 async function loadModels() {
   fileset = await FilesetResolver.forVisionTasks(WASM);
   const hOpts = d => ({ baseOptions: { modelAssetPath: HAND_MODEL, delegate: d }, runningMode: 'VIDEO', numHands: 2 });
   try { handLM = await HandLandmarker.createFromOptions(fileset, hOpts('GPU')); } catch (e) { handLM = await HandLandmarker.createFromOptions(fileset, hOpts('CPU')); }
   faceLM = await FaceLandmarker.createFromOptions(fileset, { baseOptions: { modelAssetPath: FACE_MODEL, delegate: 'CPU' }, runningMode: 'VIDEO', numFaces: 1, outputFaceBlendshapes: true });
-  try {
-    poseLM = await PoseLandmarker.createFromOptions(fileset, { baseOptions: { modelAssetPath: POSE_MODEL, delegate: 'CPU' }, runningMode: 'VIDEO', numPoses: 1, outputSegmentationMasks: true });
-  } catch (e) { console.warn('pose/segmentation unavailable', e); poseLM = null; }
+  // a selfie segmenter gives much cleaner edges than the pose mask; fall back to the pose mask if it can't load
+  const sOpts = d => ({ baseOptions: { modelAssetPath: SEG_MODEL, delegate: d }, runningMode: 'VIDEO', outputConfidenceMasks: true, outputCategoryMask: false });
+  try { segmenter = await ImageSegmenter.createFromOptions(fileset, sOpts('GPU')); }
+  catch (e) { try { segmenter = await ImageSegmenter.createFromOptions(fileset, sOpts('CPU')); } catch (e2) { segmenter = null; } }
+  if (!segmenter) { try { poseLM = await PoseLandmarker.createFromOptions(fileset, { baseOptions: { modelAssetPath: POSE_MODEL, delegate: 'CPU' }, runningMode: 'VIDEO', numPoses: 1, outputSegmentationMasks: true }); } catch (e) { poseLM = null; } }
 }
-
+function maskFrom(arr, mw, mh) {
+  if (!maskImg || maskImg.width !== mw || maskImg.height !== mh) { maskImg = mcx.createImageData(mw, mh); maskC.width = mw; maskC.height = mh; }
+  const d = maskImg.data;
+  for (let i = 0, j = 0; i < arr.length; i++, j += 4) { const v = smooth(0.35, 0.7, arr[i]); d[j] = d[j + 1] = d[j + 2] = 255; d[j + 3] = v * 255; }
+  mcx.putImageData(maskImg, 0, 0); haveMask = true;
+}
 function detect(now) {
   if (video.readyState < 2 || video.currentTime === lastVT) return;
   lastVT = video.currentTime; frameN++;
   vw = video.videoWidth || vw; vh = video.videoHeight || vh;
-  try {
-    const r = handLM.detectForVideo(video, now);
-    hands = (r.landmarks || []).map((lm, i) => analyzeHand(lm, r.worldLandmarks && r.worldLandmarks[i]));
-  } catch (e) { }
-  if (poseLM && frameN % 2 === 0) {
-    const pw = 320, ph = Math.round(320 * vh / vw);
-    if (poseIn.width !== pw || poseIn.height !== ph) { poseIn.width = pw; poseIn.height = ph; }
-    pix.drawImage(video, 0, 0, pw, ph);
+  try { const r = handLM.detectForVideo(video, now); hands = (r.landmarks || []).map((lm, i) => analyzeHand(lm, r.worldLandmarks && r.worldLandmarks[i])); } catch (e) { }
+  if (segmenter || poseLM) {
+    const sw = 512, sh = Math.round(512 * vh / vw);
+    if (segIn.width !== sw || segIn.height !== sh) { segIn.width = sw; segIn.height = sh; }
+    sgx.drawImage(video, 0, 0, sw, sh);
     try {
-      const r = poseLM.detectForVideo(poseIn, now);
-      const lm = r.landmarks && r.landmarks[0];
-      if (lm && lm[11].visibility > 0.4 && lm[12].visibility > 0.4) { const a = toScreen(lm[11]), b = toScreen(lm[12]); shoulders = { a, b, w: dist(a, b) }; }
-      const m = r.segmentationMasks && r.segmentationMasks[0];
-      if (m) {
-        const arr = m.getAsFloat32Array();
-        if (!maskImg || maskImg.width !== m.width) maskImg = mcx.createImageData(m.width, m.height);
-        const d = maskImg.data;
-        for (let i = 0, j = 3; i < arr.length; i++, j += 4) { const v = clamp((arr[i] - 0.42) / 0.3, 0, 1); d[j] = v * 255; }
-        if (maskC.width !== m.width) { maskC.width = m.width; maskC.height = m.height; }
-        mcx.putImageData(maskImg, 0, 0); haveMask = true;
-        m.close();
-        updatePlate();
+      if (segmenter) {
+        const r = segmenter.segmentForVideo(segIn, now), ms = r.confidenceMasks, m = ms && ms[ms.length - 1];
+        if (m) maskFrom(m.getAsFloat32Array(), m.width, m.height);
+        if (ms) ms.forEach(x => x.close());
+      } else if (frameN % 2 === 0) {
+        const r = poseLM.detectForVideo(segIn, now), m = r.segmentationMasks && r.segmentationMasks[0];
+        if (m) { maskFrom(m.getAsFloat32Array(), m.width, m.height); m.close(); }
       }
+      if (haveMask && frameN % 3 === 0) updateBackground();
     } catch (e) { console.warn(e); }
   }
   if (frameN % 3 === 1) {
@@ -425,37 +475,80 @@ function detect(now) {
         eyesClosed = closed;
         const top = toScreen(lm[10]), chin = toScreen(lm[152]), l = toScreen(lm[234]), rr = toScreen(lm[454]);
         faceBox = { top, chin, w: dist(l, rr), h: dist(top, chin), c: { x: (top.x + chin.x) / 2, y: (top.y + chin.y) / 2 } };
-      } else { eyesClosed = false; }
+      } else eyesClosed = false;
     } catch (e) { }
   }
 }
-// keep a picture of the room without you: copy only the pixels where you are not
-function updatePlate() {
-  const pw = 480, ph = Math.round(480 * vh / vw);
-  if (plateC.width !== pw || plateC.height !== ph) { plateC.width = pw; plateC.height = ph; tmpC.width = pw; tmpC.height = ph; plateReady = 0; }
-  if (plateReady === 0) { plx.filter = 'blur(18px)'; plx.drawImage(video, 0, 0, pw, ph); plx.filter = 'none'; }   // first guess: a blurred room
-  tcx.globalCompositeOperation = 'source-over'; tcx.clearRect(0, 0, pw, ph); tcx.drawImage(video, 0, 0, pw, ph);
-  tcx.globalCompositeOperation = 'destination-out'; tcx.filter = 'blur(6px)'; tcx.drawImage(maskC, -8, -8, pw + 16, ph + 16); tcx.drawImage(maskC, 0, 0, pw, ph); tcx.filter = 'none';
-  plx.globalAlpha = plateReady < 5 ? 1 : 0.35; plx.drawImage(tmpC, 0, 0); plx.globalAlpha = 1;
-  plateReady++;
+// the room without you: real background where it has been seen, and the gaps filled with the colours around them
+function updateBackground() {
+  const w = 480, h = Math.round(480 * vh / vw);
+  for (const c of [bgC, fillC, seenC]) if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+  bgx.globalCompositeOperation = 'source-over'; bgx.clearRect(0, 0, w, h); bgx.drawImage(video, 0, 0, w, h);
+  bgx.globalCompositeOperation = 'destination-out'; bgx.filter = 'blur(4px)';
+  bgx.drawImage(maskC, -12, -12, w + 24, h + 24); bgx.drawImage(maskC, 0, 0, w, h); bgx.filter = 'none';     // cut a little wider than you
+  // fill the hole: at low resolution, spread the surrounding colours inwards step by step (blur, then slip it underneath)
+  const lw = Math.max(4, Math.round(w / 24)), lh = Math.max(3, Math.round(h / 24));
+  if (lvlC.width !== lw || lvlC.height !== lh) { lvlC.width = lw; lvlC.height = lh; tmpL.width = lw; tmpL.height = lh; }
+  lvx.globalCompositeOperation = 'source-over'; lvx.clearRect(0, 0, lw, lh); lvx.drawImage(bgC, 0, 0, lw, lh);
+  for (let it = 0; it < 22; it++) {
+    tlx.globalCompositeOperation = 'copy'; tlx.filter = 'blur(1.2px)'; tlx.drawImage(lvlC, 0, 0); tlx.filter = 'none';
+    lvx.globalCompositeOperation = 'destination-over'; lvx.drawImage(tmpL, 0, 0);
+  }
+  for (let it = 0; it < 3; it++) { tlx.globalCompositeOperation = 'copy'; tlx.drawImage(lvlC, 0, 0); lvx.globalCompositeOperation = 'destination-over'; lvx.drawImage(tmpL, 0, 0); }
+  lvx.globalCompositeOperation = 'destination-over'; lvx.filter = 'blur(3px) brightness(1.02)'; lvx.drawImage(bgC, 0, 0, lw, lh); lvx.drawImage(video, 0, 0, lw, lh); lvx.filter = 'none';   // anything still empty (e.g. the bottom edge)
+  lvx.globalCompositeOperation = 'source-over';
+  fcx.globalCompositeOperation = 'copy'; fcx.filter = 'blur(10px)'; fcx.drawImage(lvlC, -w / lw * 2, -h / lh * 2, w + w / lw * 4, h + h / lh * 4); fcx.filter = 'none'; fcx.globalCompositeOperation = 'source-over';   /* drawn a little past the edges so the blur doesn't fade them */
+  snx.globalAlpha = 0.25; snx.drawImage(bgC, 0, 0); snx.globalAlpha = 1;    // slowly remember what is really behind you
+  fcx.drawImage(seenC, 0, 0); fcx.drawImage(bgC, 0, 0);
 }
-function cutoutPerson() {
-  const pw = 640, ph = Math.round(640 * vh / vw);
+function cutout() {
+  const pw = 960, ph = Math.round(960 * vh / vw);
   if (personC.width !== pw || personC.height !== ph) { personC.width = pw; personC.height = ph; }
-  pcx.globalCompositeOperation = 'source-over'; pcx.clearRect(0, 0, pw, ph);
-  pcx.drawImage(video, 0, 0, pw, ph);
-  pcx.globalCompositeOperation = 'destination-in'; pcx.filter = 'blur(2px)'; pcx.drawImage(maskC, 0, 0, pw, ph); pcx.filter = 'none';
+  pcx.globalCompositeOperation = 'source-over'; pcx.clearRect(0, 0, pw, ph); pcx.drawImage(video, 0, 0, pw, ph);
+  pcx.globalCompositeOperation = 'destination-in'; pcx.drawImage(maskC, 0, 0, pw, ph);
   return personC;
 }
-function silhouette(col) {
-  const pw = 640, ph = Math.round(640 * vh / vw);
-  const s = silC; if (s.width !== pw || s.height !== ph) { s.width = pw; s.height = ph; }
-  const g = s.getContext('2d'); g.globalCompositeOperation = 'source-over'; g.clearRect(0, 0, pw, ph);
-  g.filter = 'blur(1.5px)'; g.drawImage(maskC, 0, 0, pw, ph); g.filter = 'none';
-  g.globalCompositeOperation = 'source-in'; g.fillStyle = col; g.fillRect(0, 0, pw, ph);
-  return s;
-}
 const silC = document.createElement('canvas');
+function silhouette() {
+  const pw = 960, ph = Math.round(960 * vh / vw); if (silC.width !== pw || silC.height !== ph) { silC.width = pw; silC.height = ph; }
+  const g = silC.getContext('2d'); g.globalCompositeOperation = 'source-over'; g.clearRect(0, 0, pw, ph); g.drawImage(maskC, 0, 0, pw, ph);
+  g.globalCompositeOperation = 'source-in'; const gr = g.createLinearGradient(0, 0, 0, ph); gr.addColorStop(0, '#ffffff'); gr.addColorStop(1, '#eef3fb'); g.fillStyle = gr; g.fillRect(0, 0, pw, ph);
+  return silC;
+}
+
+/* ---------- 🫥 Vanish: white silhouette → breaks into light → gone → back ---------- */
+function startVanish(now) {
+  vanish.t0 = now; vanish.parts = [];
+  const mw = maskC.width, mh = maskC.height, d = maskImg.data, c = cover();
+  for (let tries = 0; tries < 30000 && vanish.parts.length < 900; tries++) {
+    const x = (Math.random() * mw) | 0, y = (Math.random() * mh) | 0; if (d[(y * mw + x) * 4 + 3] < 200) continue;
+    const sx = W - (c.ox + x / mw * c.dw), sy = c.oy + y / mh * c.dh;
+    vanish.parts.push({ x: sx, y: sy, vx: rand(-0.6, 0.6), vy: rand(-1.6, -0.2), r: rand(0.8, 2.4), delay: rand(0, 0.6) + (1 - y / mh) * 0.5 });
+  }
+  say('Vanishing…');
+}
+function drawVanish(now) {
+  const va = (now - vanish.t0) / 1000; if (va < 0 || va > 5.2 || !haveMask) return;
+  const room = smooth(0.9, 1.6, va) * (1 - smooth(4.0, 5.0, va));
+  const sil = smooth(0, 0.45, va) * (1 - smooth(1.0, 1.8, va));
+  if (room > 0) { ctx.save(); ctx.globalAlpha = room; drawMirrored(fillC, 'saturate(1.04) brightness(1.04) contrast(1.02)'); ctx.restore();
+    ctx.save(); ctx.globalCompositeOperation = 'soft-light'; ctx.globalAlpha = 0.22 * room; ctx.fillStyle = '#bcd3f0'; ctx.fillRect(0, 0, W, H); ctx.restore(); }
+  if (sil > 0) {
+    ctx.save(); ctx.globalAlpha = sil * 0.35; ctx.fillStyle = '#6f8fbf'; ctx.globalCompositeOperation = 'multiply'; ctx.fillRect(0, 0, W, H); ctx.restore();
+    ctx.save(); ctx.globalAlpha = sil; ctx.shadowColor = 'rgba(255,255,255,0.9)'; ctx.shadowBlur = 24; drawMirrored(silhouette()); ctx.restore();
+  }
+  if (va > 1.0 && va < 4.2) {
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    for (const p of vanish.parts) {
+      const k = va - 1.0 - p.delay; if (k < 0) continue;
+      const a = clamp(1 - k / 2.2, 0, 1); if (a <= 0) continue;
+      const x = p.x + p.vx * k * 60 + Math.sin(k * 3 + p.r) * 6, y = p.y + p.vy * k * 60 - k * k * 20;
+      ctx.fillStyle = `rgba(255,255,255,${a * 0.9})`; ctx.beginPath(); ctx.arc(x, y, p.r, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+  if (va > 4.0 && va < 4.1 && faceBox) glint(faceBox.c.x, faceBox.c.y, 20, 120);
+}
 
 /* ---------- Main loop ---------- */
 let lastT = performance.now(), running = false;
@@ -463,80 +556,47 @@ function frame() {
   requestAnimationFrame(frame);
   const now = performance.now(), dt = Math.min(0.1, (now - lastT) / 1000), t = now / 1000; lastT = now;
   detect(now); updateBeat(now); updateGestures(hands, now, dt);
-  let wantWings = eyesClosed ? (now - eyesClosedSince > 200) : (now - eyesOpenSince < 1500 && wingAmt > 0.25);
-  if (window.__forceWings) wantWings = true;
-  wingAmt = lerp(wingAmt, wantWings ? 1 : 0, ease(dt, wantWings ? 4 : 1.5));
-  if (wingAmt > 0.3) say('😌 Misty blue wings');
-  if (!hands.length && !eyesClosed && now - statusAt > 2500) say(haveMask ? '☁️ Point · raise a palm · flat hands · two fists · hands up' : '☁️ Looking for you…');
-  const palms = hands.filter(h => h.open).map(h => ({ x: h.c.x, y: h.c.y - h.size * 0.6, r: h.size * 1.4 }));
+  const wantDream = window.__forceDream || (eyesClosed ? now - eyesClosedSince > 250 : (now - eyesOpenSince < 1200 && dreamAmt > 0.3));
+  dreamAmt = lerp(dreamAmt, wantDream ? 1 : 0, ease(dt, wantDream ? 2.5 : 1.5));
+  if (dreamAmt > 0.4) say('Dreaming');
+  if (!hands.length && dreamAmt < 0.3 && now - statusAt > 2600) say(haveMask ? 'Point · raise a palm · flat hands · two fists · hands up' : 'Looking for you…');
+  const palms = hands.filter(h => h.open).map(h => ({ x: h.c.x, y: h.c.y - h.size * 0.4, r: h.size * 1.5 }));
   updateBirds(dt, scene.sky > 0.2 ? palms : []);
-  $('beatDot').style.transform = `scale(${1 + beat * 1.2})`; $('beatDot').style.background = analyser ? `rgba(160,210,255,${0.5 + beat * 0.5})` : 'rgba(255,255,255,.35)';
+  $('beatDot').style.transform = `scale(${1 + beat * 1.2})`; $('beatDot').style.background = analyser ? `rgba(170,205,255,${0.5 + beat * 0.5})` : 'rgba(255,255,255,.35)';
 
-  ctx.fillStyle = '#0d1830'; ctx.fillRect(0, 0, W, H);
-  if (video.readyState < 2) return;
-  // 1) your room, softly graded
-  drawMirrored(video, 'saturate(1.05) brightness(1.05)');
-  ctx.save(); ctx.globalCompositeOperation = 'soft-light'; ctx.globalAlpha = 0.25; ctx.fillStyle = '#b9d4f2'; ctx.fillRect(0, 0, W, H); ctx.restore();
-  // 2) scenes behind you
-  if (scene.aura > 0.01) drawAura(t, scene.aura, faceBox ? faceBox.c : null);
-  if (scene.wire > 0.01) drawWire(t, scene.wire);
-  if (scene.sky > 0.01) drawSky(t, scene.sky);
-  // 3) wings behind you
-  let sh = shoulders;
-  if (!sh && faceBox) { const cx = faceBox.c.x, y = faceBox.chin.y + faceBox.h * 0.55; sh = { a: { x: cx - faceBox.w * 0.9, y }, b: { x: cx + faceBox.w * 0.9, y }, w: faceBox.w * 1.8 }; }
-  if (sh && wingAmt > 0.01) {
-    const [L, R] = sh.a.x < sh.b.x ? [sh.a, sh.b] : [sh.b, sh.a];
-    drawWing({ x: L.x + sh.w * 0.12, y: L.y - sh.w * 0.05 }, -1, sh.w, t);
-    drawWing({ x: R.x - sh.w * 0.12, y: R.y - sh.w * 0.05 }, 1, sh.w, t);
-    if (Math.random() < 0.3) spark(rand(L.x - sh.w, R.x + sh.w), rand(L.y - sh.w, L.y), 1, 10);
-  }
-  // 4) you, in front of the scene
-  const sceneMax = Math.max(scene.sky, scene.wire, scene.aura);
-  if (haveMask && (sceneMax > 0.01 || wingAmt > 0.01)) {
-    const p = cutoutPerson();
-    ctx.save();
-    if (scene.aura > 0.01) { ctx.shadowColor = `rgba(200,225,255,${0.9 * scene.aura})`; ctx.shadowBlur = 40 * scene.aura; ctx.filter = `brightness(${1 + 0.15 * scene.aura})`; }
-    drawMirrored(p); ctx.restore();
-  }
-  // 5) 🫥 vanish: white silhouette → gone (only the room is left) → back
-  const va = (now - vanish.t0) / 1000;
-  if (va >= 0 && va < 4.6 && haveMask) {
-    const plateA = va < 0.8 ? 0 : va < 1.6 ? (va - 0.8) / 0.8 : va < 3.6 ? 1 : 1 - (va - 3.6) / 1.0;
-    const silA = va < 0.5 ? va / 0.5 : va < 1.3 ? 1 : va < 2.1 ? 1 - (va - 1.3) / 0.8 : 0;
-    if (plateA > 0) {
-      ctx.save(); ctx.globalAlpha = clamp(plateA, 0, 1); drawMirrored(plateC, 'saturate(1.05) brightness(1.05)'); ctx.restore();
-      ctx.save(); ctx.globalCompositeOperation = 'soft-light'; ctx.globalAlpha = 0.25 * clamp(plateA, 0, 1); ctx.fillStyle = '#b9d4f2'; ctx.fillRect(0, 0, W, H); ctx.restore();
+  ctx.fillStyle = '#0b0f18'; ctx.fillRect(0, 0, W, H);
+  if (video.readyState >= 2) {
+    drawMirrored(video, 'saturate(1.04) brightness(1.04) contrast(1.02)');
+    ctx.save(); ctx.globalCompositeOperation = 'soft-light'; ctx.globalAlpha = 0.22; ctx.fillStyle = '#bcd3f0'; ctx.fillRect(0, 0, W, H); ctx.restore();
+    if (scene.aura > 0.01) drawAura(t, scene.aura, faceBox ? faceBox.c : null);
+    if (scene.wire > 0.01) drawWire(t, scene.wire);
+    if (scene.sky > 0.01) drawSky(t, scene.sky);
+    const sceneMax = Math.max(scene.sky, scene.wire, scene.aura);
+    if (haveMask && sceneMax > 0.01) {
+      ctx.save();
+      if (scene.aura > 0.01) { ctx.shadowColor = `rgba(200,225,255,${0.9 * scene.aura})`; ctx.shadowBlur = 40 * scene.aura; }
+      drawMirrored(cutout()); ctx.restore();
     }
-    if (silA > 0) {
-      // the room fades to a cool blue-grey and you turn into a white cut-out
-      ctx.save(); ctx.globalAlpha = 0.55 * clamp(silA, 0, 1); ctx.fillStyle = '#7f9cc4'; ctx.globalCompositeOperation = 'multiply'; ctx.fillRect(0, 0, W, H); ctx.restore();
-      ctx.save(); ctx.globalAlpha = clamp(silA, 0, 1); ctx.shadowColor = 'rgba(255,255,255,0.8)'; ctx.shadowBlur = 18; drawMirrored(silhouette('#f6f8fb')); ctx.restore();
-    }
-    if (va > 3.6 && va < 3.8) spark(faceBox ? faceBox.c.x : W / 2, faceBox ? faceBox.c.y : H / 2, 20, 120);
+    drawDream(t, dreamAmt);
+    drawVanish(now);
   }
-  // 6) in front: birds, sparkles, then the water drops bend everything
-  drawBirds(scene.sky); drawSparks();
-  drawRipples(now);
+  drawBirds(scene.sky); drawHandLines(); drawGlints(); drawDrops(now);
+  present(now);
 }
 
-/* ---------- Recording ---------- */
+/* ---------- Recording (the WebGL layer, water included) ---------- */
 let rec = null, chunks = [];
 $('recBtn').onclick = () => {
   if (rec && rec.state === 'recording') { rec.stop(); return; }
   try {
-    const stream = canvas.captureStream(30);
+    const stream = (gl ? glc : canvas).captureStream(30);
     if (micStream) micStream.getAudioTracks().forEach(tr => stream.addTrack(tr));
     const mime = ['video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm'].find(m => MediaRecorder.isTypeSupported(m)) || '';
     rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined); chunks = [];
     rec.ondataavailable = e => e.data.size && chunks.push(e.data);
-    rec.onstop = () => {
-      const type = rec.mimeType || 'video/webm';
-      const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(chunks, { type }));
-      a.download = 'dreamscape.' + (type.includes('mp4') ? 'mp4' : 'webm'); a.click();
-      $('recBtn').classList.remove('on'); $('recBtn').textContent = '⏺ Record';
-    };
-    rec.start(); $('recBtn').classList.add('on'); $('recBtn').textContent = '⏹ Stop & save';
-  } catch (e) { console.error(e); $('recBtn').textContent = 'Recording not supported'; }
+    rec.onstop = () => { const type = rec.mimeType || 'video/webm'; const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(chunks, { type })); a.download = 'dreamscape.' + (type.includes('mp4') ? 'mp4' : 'webm'); a.click(); $('recBtn').classList.remove('on'); $('recBtn').textContent = '● Rec'; };
+    rec.start(); $('recBtn').classList.add('on'); $('recBtn').textContent = '■ Stop';
+  } catch (e) { $('recBtn').textContent = 'No rec'; }
 };
 
 /* ---------- Start ---------- */
@@ -547,8 +607,9 @@ $('startBtn').onclick = async () => {
     video.srcObject = stream; await video.play();
     $('start').style.display = 'none'; say('Loading models…');
     if (!running) { running = true; requestAnimationFrame(frame); }
+    setTimeout(() => { skyTex = skyTex || makeSky(); }, 50);
     await loadModels();
-    say('☁️ Point · raise a palm · flat hands · two fists · hands up');
+    say('Point · raise a palm · flat hands · two fists · hands up');
   } catch (e) {
     console.error(e); $('start').style.display = 'flex'; btn.disabled = false; btn.textContent = 'Try again';
     $('err').textContent = 'Could not open the camera or load the models. Please allow camera access, check your internet connection, and use Chrome or Safari. (' + (e.message || e) + ')';
@@ -556,9 +617,9 @@ $('startBtn').onclick = async () => {
 };
 
 // for automated tests
-window.__ds = () => ({ hands: hands.length, flags: hands.map(h => (h.point ? 'P' : '') + (h.up ? 'U' : '') + (h.flat ? 'F' : '') + (h.fist ? 'X' : '') + (h.open ? 'O' : '')).join(','), sky: +scene.sky.toFixed(2), wire: +scene.wire.toFixed(2), aura: +scene.aura.toFixed(2), vanish: performance.now() - vanish.t0 < 4600, ripples: ripples.length, mask: haveMask, wing: +wingAmt.toFixed(2), status: statusMsg });
-window.__scene = (k) => { sceneUntil[k] = performance.now() + 60000; };
-window.__vanish = () => { vanish.t0 = performance.now(); };
+window.__ds = () => ({ hands: hands.length, flags: hands.map(h => (h.point ? 'P' : '') + (h.up ? 'U' : '') + (h.flat ? 'F' : '') + (h.fist ? 'X' : '') + (h.open ? 'O' : '')).join(','), sky: +scene.sky.toFixed(2), wire: +scene.wire.toFixed(2), aura: +scene.aura.toFixed(2), vanish: performance.now() - vanish.t0 < 5200, ripples: ripples.length, mask: haveMask, seg: !!segmenter, gl: !!gl, dream: +dreamAmt.toFixed(2), status: statusMsg });
+window.__scene = k => { for (const q in sceneUntil) sceneUntil[q] = 0; if (k) sceneUntil[k] = performance.now() + 60000; };
+window.__vanish = () => startVanish(performance.now());
 window.__drop = (x, y) => addRipple(x * W, y * H, 1);
 </script>
 </body>
