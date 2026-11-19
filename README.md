@@ -10,6 +10,7 @@ Built with [MediaPipe Tasks Vision](https://developers.google.com/mediapipe) and
 | Page | What it does |
 |---|---|
 | `magic-hands.html` | Webcam effects: open palm grows flowers, ✌️ collects them, 🫰 finger heart pops sticker hearts, 🫶 two-hand heart bursts hearts, 💌 words on fingertips, 🌫 breathe on the "window" and write in the fog |
+| `dreamscape.html` | AR daydream: your room is replaced with sky and layered mountains (pose segmentation). Wave to steer a flock of birds, turn your wrist to turn them, open your palm to grow a mountain ridge from your palm lines and spread your fingers to add far-away layers, close your eyes to grow misty blue wings, and turn on music sync so everything pulses with the beat (microphone onset detection) |
 | `gesture-dance.html` | Load a gesture-dance tutorial video, dance along in front of the camera, and get Perfect / Good / Miss on every beat, a final grade, and an optional recording |
 
 ## How it works
@@ -27,6 +28,8 @@ Built with [MediaPipe Tasks Vision](https://developers.google.com/mediapipe) and
   | real human follower | A |
   | standing still | D |
   | unrelated motion | D |
+
+- **Dreamscape:** Hand Landmarker (GPU) for waves, wrist roll and finger spread; Pose Landmarker with segmentation masks (CPU) for background replacement and shoulder anchors; Face Landmarker blendshapes (`eyeBlinkLeft/Right`) for the wings; Web Audio bass-energy onsets for beat sync. Finger-spread and eye-closure thresholds were calibrated on a real recording.
 
 ## Privacy
 
