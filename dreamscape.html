@@ -588,7 +588,7 @@ function drawDark() {
 const scene = { sky: 0, wire: 0, aura: 0 }, sceneUntil = { sky: 0, wire: 0, aura: 0 };
 let lastTip = null, lastDropAt = 0, holdFlat = 0, holdUp = 0, holdFist = 0, holdVanish = 0;
 const vanish = { t0: -1e9, parts: [] };
-let holdVisor = 0;
+let holdVisor = 0, holdDark = 0;
 function updateGestures(hands, now, dt) {
   const vanishing = now - vanish.t0 < 5200;
   const fc = faceBox, fw = fc ? fc.w : W * 0.15;
@@ -618,7 +618,10 @@ function updateGestures(hands, now, dt) {
   const byFace = hands.filter(h => h.open && fc && dist(h.c, fc.c) < fw * 1.7);
   if (byFace.length === 1 && ups.length < 2) { bwUntil = now + 1400; say('Film'); }
   // ✋ a hand right up to the camera → lights out
-  if (hands.some(h => h.open && h.size > (fc ? fw * 1.6 : Math.min(W, H) * 0.32))) { darkUntil = now + 700; say('Lights out'); }
+  // (only when the hand nearly covers the camera, held for half a second — raising your hands normally never does this)
+  const covering = hands.some(h => h.open && h.size > Math.min(W, H) * 0.42 && (!fc || h.size > fw * 2.2));
+  holdDark = covering ? holdDark + dt : 0;
+  if (holdDark > 0.5) { darkUntil = now + 700; say('Lights out'); }
   // ✊✊ fists by your chin → visor (and petals);  fists further out → glow
   const chinFists = fists.filter(h => fc && dist(h.c, fc.chin) < fw * 2.1);
   holdVisor = chinFists.length === 2 ? holdVisor + dt : 0;
