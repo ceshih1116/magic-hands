@@ -58,9 +58,14 @@
     <h1>Dream<i>scape</i></h1>
     <div class="how">
       <b>☝️ Point one finger</b> (or tap the screen) — a drop of water on the glass<br>
-      <b>🖐 Raise an open palm</b> — a blue sky, and the doves circle your hand<br>
+      <b>😮 Breathe "haa" on the screen</b> — it mists over; wipe it clear with your hand<br>
+      <b>🤏 Pinch with both hands and pull</b> — a picture card; let go and it floats beside you<br>
+      <b>🖐🖐 Raise both open palms</b> — a blue sky, and the doves circle your hands<br>
       <b>🤲 Hands flat, palms down</b> — a wireframe mountain world rises under them<br>
-      <b>✊✊ Two fists</b> — a blue glow with rays of light<br>
+      <b>✊✊ Fists by your chin</b> — a glass visor and petals · <b>further out</b> — a blue glow<br>
+      <b>☝️☝️ Both index fingers up</b> — petals drift down<br>
+      <b>🖐 One hand open beside your face</b> — black-and-white film<br>
+      <b>✋ Hand right up to the camera</b> — lights out<br>
       <b>🙌 Both hands up beside your head</b> — you turn to light and vanish<br>
       <b>😌 Close your eyes</b> — everything drifts into a soft dream<br>
       <b>Music sync</b> — everything pulses with the beat
@@ -220,7 +225,7 @@ function present(now) {
 }
 
 /* ---------- ☁️ Sky: soft, photographic clouds (fbm noise, pre-rendered once) ---------- */
-let skyTex = null;
+let skyTex = null; const skyL = document.createElement('canvas');
 function makeSky() {
   const w = 768, h = 432, c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
   const img = g.createImageData(w, h), d = img.data;
@@ -247,7 +252,12 @@ function drawSky(t, a) {
   ctx.save(); ctx.globalAlpha = a;
   const s = Math.max(W / skyTex.width, H / skyTex.height) * 1.02, tw = skyTex.width * s, th = skyTex.height * s;
   const off = (t * 8) % tw;
-  ctx.drawImage(skyTex, -off, (H - th) / 2, tw, th); ctx.drawImage(skyTex, tw - off - 1, (H - th) / 2, tw, th);
+  skyL.width = Math.round(W / 2); skyL.height = Math.round(H / 2); const sl = skyL.getContext('2d');
+  sl.drawImage(skyTex, -off / 2, (H - th) / 4, tw / 2, th / 2); sl.drawImage(skyTex, (tw - off - 1) / 2, (H - th) / 4, tw / 2, th / 2);
+  sl.globalCompositeOperation = 'destination-in'; const fade = sl.createLinearGradient(0, 0, 0, H / 2);
+  fade.addColorStop(0, '#000'); fade.addColorStop(0.62, '#000'); fade.addColorStop(1, 'rgba(0,0,0,0.45)'); sl.fillStyle = fade; sl.fillRect(0, 0, W / 2, H / 2);
+  ctx.drawImage(skyL, 0, 0, W, H);
+  const hz = ctx.createLinearGradient(0, H * 0.55, 0, H); hz.addColorStop(0, 'rgba(225,236,250,0)'); hz.addColorStop(1, 'rgba(225,236,250,0.25)'); ctx.fillStyle = hz; ctx.fillRect(0, 0, W, H);
   const sun = ctx.createRadialGradient(W * 0.82, H * 0.12, 0, W * 0.82, H * 0.12, Math.max(W, H) * 0.5);
   sun.addColorStop(0, 'rgba(255,250,235,0.45)'); sun.addColorStop(1, 'rgba(255,250,235,0)'); ctx.fillStyle = sun; ctx.fillRect(0, 0, W, H);
   ctx.restore();
@@ -340,7 +350,7 @@ function drawAura(t, a, center) {
 }
 
 /* ---------- 😌 Dream (eyes closed): soft focus, light leaks, floating bokeh ---------- */
-let dreamAmt = 0, eyesClosedSince = 0, eyesOpenSince = 0, eyesClosed = false;
+const mouthBase = { j: 0.05, f: 0.02 }; let lastMouth = [], lastBlink = 0, lastSquint = 0, lastLook = 0, dreamAmt = 0, eyesClosedSince = 0, eyesOpenSince = 0, eyesClosed = false;
 const bokeh = Array.from({ length: 26 }, () => ({ x: rand(0, 1), y: rand(0, 1), r: rand(10, 46), vy: rand(-0.02, -0.006), ph: rand(0, 6), hue: Math.random() }));
 function drawDream(t, a) {
   if (a < 0.02) return;
@@ -388,7 +398,9 @@ function analyzeHand(lms, wl) {
   const dx = p[9].x - p[0].x, dy = p[9].y - p[0].y;
   const up = open && dy < -Math.abs(dx) * 0.9;
   const flat = open && Math.abs(dy) < Math.abs(dx) * 0.85;
-  return { p, open, point, fist, up, flat, c, size: dist(p[0], p[9]) };
+  const pinch = !open && d3(4, 8) / (d3(0, 9) || 1) < 0.28 && (ext[1] || ext[2] || ext[3] || rr[1] > 0.95);   // thumb and index tips together, the other fingers loose
+  const pp = { x: (p[4].x + p[8].x) / 2, y: (p[4].y + p[8].y) / 2 };
+  return { p, open, point, fist, up, flat, pinch, pp, c, size: dist(p[0], p[9]) };
 }
 function drawHandLines() {
   ctx.save(); ctx.lineWidth = 0.8; ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.fillStyle = 'rgba(255,255,255,0.9)';
@@ -399,31 +411,226 @@ function drawHandLines() {
   ctx.restore();
 }
 
+/* ---------- 😮 Fog on the glass: breathe out (open your mouth) and it mists over; wipe it with your hand ---------- */
+const fogC = document.createElement('canvas'), fgx = fogC.getContext('2d');        // fog density (alpha), screen space at 1/4 size
+const fogLayer = document.createElement('canvas'), flx = fogLayer.getContext('2d');
+let fogAmt = 0, fogUntil = 0, mouthOpenAmt = 0, mouthSince = 0;
+const lastWipe = {};
+function updateFog(now, dt) {
+  const fw = Math.max(2, Math.round(W / 4)), fh = Math.max(2, Math.round(H / 4));
+  if (fogC.width !== fw || fogC.height !== fh) { fogC.width = fw; fogC.height = fh; fogLayer.width = fw; fogLayer.height = fh; }
+  const on = now < fogUntil;
+  fogAmt = lerp(fogAmt, on ? 1 : 0, ease(dt, on ? 1.4 : 0.8));
+  if (fogAmt < 0.01) { fgx.clearRect(0, 0, fw, fh); return; }
+  // mist creeps back slowly where it was wiped
+  fgx.globalCompositeOperation = 'source-over'; fgx.fillStyle = `rgba(255,255,255,${on ? 0.012 : 0})`; fgx.fillRect(0, 0, fw, fh);
+  // every open palm wipes a soft streak
+  fgx.globalCompositeOperation = 'destination-out';
+  for (const h of hands) {
+    if (!h.open) continue;
+    const key = Math.round(h.p[0].x / 300), prev = lastWipe[key], cur = { x: h.c.x / 4, y: (h.c.y - h.size * 0.4) / 4 }, r = h.size * 0.55 / 4;
+    const steps = prev ? Math.ceil(dist(prev, cur) / (r * 0.4)) + 1 : 1;
+    for (let i = 0; i < steps; i++) {
+      const k = steps === 1 ? 1 : i / (steps - 1), x = prev ? lerp(prev.x, cur.x, k) : cur.x, y = prev ? lerp(prev.y, cur.y, k) : cur.y;
+      const g = fgx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, 'rgba(0,0,0,0.9)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+      fgx.fillStyle = g; fgx.beginPath(); fgx.arc(x, y, r, 0, Math.PI * 2); fgx.fill();
+    }
+    lastWipe[key] = cur;
+  }
+  if (!hands.some(h => h.open)) for (const k in lastWipe) delete lastWipe[k];
+  fgx.globalCompositeOperation = 'source-over';
+}
+function startFog(now) {
+  if (now >= fogUntil) { fgx.globalCompositeOperation = 'source-over'; fgx.fillStyle = 'rgba(255,255,255,1)'; fgx.fillRect(0, 0, fogC.width, fogC.height); }
+  fogUntil = now + 12000;
+}
+function drawFog(t) {
+  if (fogAmt < 0.01) return;
+  const fw = fogLayer.width, fh = fogLayer.height;
+  // frosted glass: a blurred, brighter copy of the picture, only where the mist is
+  flx.globalCompositeOperation = 'copy'; flx.filter = 'blur(5px) brightness(1.12) saturate(0.85)'; flx.drawImage(canvas, 0, 0, fw, fh); flx.filter = 'none';
+  flx.globalCompositeOperation = 'source-over'; flx.fillStyle = 'rgba(236,242,248,0.35)'; flx.fillRect(0, 0, fw, fh);
+  flx.globalCompositeOperation = 'destination-in'; flx.drawImage(fogC, 0, 0);
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = fogAmt; ctx.drawImage(fogLayer, 0, 0, canvas.width, canvas.height); ctx.restore();
+}
+
+/* ---------- 🤏 Pinch with both hands and pull out a card; let go and it stays floating in the air beside you ---------- */
+const MINI = ['sunset', 'lavender', 'aurora', 'blossom', 'lake', 'dunes'];
+const miniTex = {};
+function miniScene(kind) {
+  if (miniTex[kind]) return miniTex[kind];
+  const w = 320, h = 200, c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
+  const sky = { sunset: ['#2b2f6b', '#c4628a', '#ffb07a'], lavender: ['#8fb3e8', '#d9c6f0', '#fbe6ea'], aurora: ['#06172e', '#0d3a52', '#1b5a63'], blossom: ['#a9d2f5', '#e8eefa', '#fde4ec'], lake: ['#6fa8dc', '#b7d7ef', '#e9f2f7'], dunes: ['#120c2c', '#3a2a63', '#b9757e'] }[kind];
+  const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, sky[0]); gr.addColorStop(0.6, sky[1]); gr.addColorStop(1, sky[2]); g.fillStyle = gr; g.fillRect(0, 0, w, h);
+  const hill = (y0, amp, f, ph, col) => { g.beginPath(); g.moveTo(0, h); for (let x = 0; x <= w; x += 4) g.lineTo(x, y0 + Math.sin(x * f + ph) * amp + Math.sin(x * f * 2.7 + ph) * amp * 0.35); g.lineTo(w, h); g.closePath(); g.fillStyle = col; g.fill(); };
+  if (kind === 'sunset') { g.fillStyle = 'rgba(255,230,190,0.9)'; g.beginPath(); g.arc(w * 0.62, h * 0.62, 26, 0, Math.PI * 2); g.fill(); g.fillStyle = '#3c3f7a'; g.fillRect(0, h * 0.66, w, h); for (let i = 0; i < 18; i++) { g.fillStyle = `rgba(255,190,150,${0.5 - i * 0.02})`; g.fillRect(w * 0.62 - 30 + Math.random() * 10, h * 0.68 + i * 3.5, 50 - i * 2, 1.5); } }
+  if (kind === 'lavender') { hill(h * 0.55, 8, 0.02, 1, '#9b8ec9'); for (let r = 0; r < 14; r++) { const y = h * 0.6 + r * r * 0.5; g.strokeStyle = `rgba(${120 + r * 4},${90 + r * 3},${190 - r * 3},0.9)`; g.lineWidth = 1 + r * 0.25; g.beginPath(); g.moveTo(w / 2, h * 0.58); g.lineTo(w / 2 + (r - 7) * 40, h); g.stroke(); } }
+  if (kind === 'aurora') { for (let k = 0; k < 3; k++) for (let x = 0; x < w; x += 2) { const y0 = 30 + k * 18 + Math.sin(x * 0.03 + k) * 14, l = g.createLinearGradient(0, y0, 0, y0 + 70); l.addColorStop(0, 'rgba(90,255,180,0)'); l.addColorStop(0.3, `rgba(90,255,${180 + k * 20},0.16)`); l.addColorStop(1, 'rgba(90,200,255,0)'); g.fillStyle = l; g.fillRect(x, y0, 2, 70); } hill(h * 0.78, 10, 0.03, 2, '#04101e'); }
+  if (kind === 'blossom') { hill(h * 0.8, 6, 0.02, 0, '#9fc79a'); for (let i = 0; i < 220; i++) { g.fillStyle = `rgba(255,${180 + Math.random() * 40},${200 + Math.random() * 40},${0.6 + Math.random() * 0.4})`; g.beginPath(); g.arc(rand(0, w), rand(0, h * 0.55) + Math.abs(rand(-1, 1)) * 30, rand(2, 6), 0, Math.PI * 2); g.fill(); } g.strokeStyle = '#6b4a3a'; g.lineWidth = 4; g.beginPath(); g.moveTo(w * 0.3, h); g.quadraticCurveTo(w * 0.32, h * 0.6, w * 0.45, h * 0.35); g.stroke(); }
+  if (kind === 'lake') { hill(h * 0.5, 22, 0.018, 0.5, '#7d93b5'); hill(h * 0.56, 12, 0.03, 2.1, '#5f7e8e'); const l = g.createLinearGradient(0, h * 0.62, 0, h); l.addColorStop(0, '#8fbbd8'); l.addColorStop(1, '#2f5e7a'); g.fillStyle = l; g.fillRect(0, h * 0.62, w, h); for (let i = 0; i < 30; i++) { g.fillStyle = 'rgba(255,255,255,0.3)'; g.fillRect(rand(0, w), rand(h * 0.65, h), rand(10, 30), 1); } }
+  if (kind === 'dunes') { for (let i = 0; i < 90; i++) { g.fillStyle = `rgba(255,255,255,${rand(0.3, 1)})`; g.fillRect(rand(0, w), rand(0, h * 0.5), 1.2, 1.2); } hill(h * 0.68, 14, 0.015, 1, '#6b3f55'); hill(h * 0.78, 10, 0.022, 3, '#3a2238'); }
+  // a little film softness and grain
+  g.fillStyle = 'rgba(255,255,255,0.05)'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 1200; i++) { g.fillStyle = `rgba(${Math.random() < 0.5 ? '255,255,255' : '0,0,0'},0.05)`; g.fillRect(rand(0, w), rand(0, h), 1, 1); }
+  return miniTex[kind] = c;
+}
+const cards = [];                    // floating cards in the air
+let pull = null, cardN = 0;          // the card you are pulling out right now
+function cardSlot(i) {               // places around your head: right, left, upper right, upper left, …
+  const fc = faceBox ? faceBox.c : { x: W / 2, y: H * 0.35 }, fw = faceBox ? faceBox.w : W * 0.15;
+  const side = i % 2 ? -1 : 1, row = Math.floor(i / 2) % 3;
+  return { x: fc.x + side * (fw * 1.55 + row * fw * 0.25), y: fc.y - fw * 0.25 + (row - 1) * fw * 0.85 };
+}
+function updateCards(now, dt) {
+  const pin = hands.filter(h => h.pinch);
+  if (pin.length === 2) {
+    const [a, b] = pin.sort((u, v) => u.pp.x - v.pp.x);
+    if (!pull) { pull = { kind: MINI[cardN % MINI.length], born: now, a: { ...a.pp }, b: { ...b.pp } }; glint(a.pp.x, a.pp.y, 6, 8); glint(b.pp.x, b.pp.y, 6, 8); }
+    pull.a = { x: lerp(pull.a.x, a.pp.x, ease(dt, 20)), y: lerp(pull.a.y, a.pp.y, ease(dt, 20)) }; pull.b = { x: lerp(pull.b.x, b.pp.x, ease(dt, 20)), y: lerp(pull.b.y, b.pp.y, ease(dt, 20)) };
+    pull.seen = now; say('Pull it wider — let go to pin it in the air');
+  } else if (pull && now - pull.seen > 180) {
+    const len = dist(pull.a, pull.b);
+    if (len > Math.min(W, H) * 0.12 && now - pull.born > 350) {
+      const slot = cardSlot(cards.length), w = Math.min(W, H) * 0.2;
+      cards.push({ kind: pull.kind, x: (pull.a.x + pull.b.x) / 2, y: (pull.a.y + pull.b.y) / 2, w: len, ang: Math.atan2(pull.b.y - pull.a.y, pull.b.x - pull.a.x), tx: slot.x, ty: slot.y, tw: w, born: now, ph: rand(0, 6) });
+      if (cards.length > 6) cards.shift();
+      cardN++; say('Pinned');
+    }
+    pull = null;
+  }
+  for (const c of cards) {
+    const k = ease(dt, 4); c.x = lerp(c.x, c.tx, k); c.y = lerp(c.y, c.ty, k); c.w = lerp(c.w, c.tw, k); c.ang = lerp(c.ang, 0, k);
+  }
+  // keep the pinned cards around your head as you move
+  cards.forEach((c, i) => { const s = cardSlot(i); c.tx = lerp(c.tx, s.x, ease(dt, 2)); c.ty = lerp(c.ty, s.y, ease(dt, 2)); });
+}
+function drawCard(kind, cx, cy, w, ang, alpha, t, stretching) {
+  const h = w * 0.62, img = miniScene(kind);
+  ctx.save(); ctx.translate(cx, cy); ctx.rotate(ang); ctx.globalAlpha = alpha;
+  ctx.shadowColor = 'rgba(20,40,80,0.35)'; ctx.shadowBlur = 18; ctx.shadowOffsetY = 6;
+  ctx.beginPath(); ctx.roundRect ? ctx.roundRect(-w / 2, -h / 2, w, h, Math.min(10, w * 0.04)) : ctx.rect(-w / 2, -h / 2, w, h); ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.fill();
+  ctx.shadowColor = 'transparent'; ctx.save(); ctx.clip();
+  ctx.globalAlpha = alpha * (stretching ? 0.82 : 0.95); ctx.drawImage(img, -w / 2, -h / 2, w, h);
+  const sh = ctx.createLinearGradient(-w / 2, -h / 2, w / 2, h / 2), sx = ((t * 0.35) % 1.6) - 0.3;   // glass sheen sweeping across
+  sh.addColorStop(clamp(sx - 0.15, 0, 1), 'rgba(255,255,255,0)'); sh.addColorStop(clamp(sx, 0, 1), 'rgba(255,255,255,0.28)'); sh.addColorStop(clamp(sx + 0.15, 0, 1), 'rgba(255,255,255,0)');
+  ctx.globalAlpha = alpha; ctx.fillStyle = sh; ctx.fillRect(-w / 2, -h / 2, w, h);
+  ctx.restore();
+  ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 1; ctx.stroke();
+  ctx.restore();
+}
+function drawCards(now, t) {
+  for (const c of cards) {
+    const age = (now - c.born) / 1000, a = clamp(age * 4, 0, 1) * (age > 40 ? clamp(1 - (age - 40) / 2, 0, 1) : 1);
+    drawCard(c.kind, c.x, c.y + Math.sin(t * 1.2 + c.ph) * 4, c.w, c.ang + Math.sin(t * 0.8 + c.ph) * 0.03, a, t, false);
+  }
+  for (let i = cards.length - 1; i >= 0; i--) if ((now - cards[i].born) / 1000 > 42) cards.splice(i, 1);
+  if (pull) {
+    const len = dist(pull.a, pull.b), ang = Math.atan2(pull.b.y - pull.a.y, pull.b.x - pull.a.x);
+    drawCard(pull.kind, (pull.a.x + pull.b.x) / 2, (pull.a.y + pull.b.y) / 2, Math.max(20, len), ang, clamp((now - pull.born) / 250, 0, 1), t, true);
+  }
+}
+
+/* ---------- 🥽 Visor: fists up by your chin → a glass band slides over your eyes ---------- */
+let visorAmt = 0, visorUntil = 0;
+function drawVisor(t) {
+  if (visorAmt < 0.02 || !faceBox || !faceBox.eL) return;
+  const { eL, eR } = faceBox, cx = (eL.x + eR.x) / 2, cy = (eL.y + eR.y) / 2, ang = Math.atan2(eR.y - eL.y, eR.x - eL.x);
+  const w = dist(eL, eR) * 2.1 * (0.6 + 0.4 * visorAmt), h = faceBox.h * 0.2;
+  ctx.save(); ctx.translate(cx, cy); ctx.rotate(ang); ctx.globalAlpha = visorAmt;
+  const path = () => { ctx.beginPath(); ctx.moveTo(-w / 2, -h / 2); ctx.lineTo(w / 2, -h / 2); ctx.quadraticCurveTo(w / 2 + h * 0.25, 0, w / 2, h / 2); ctx.lineTo(-w / 2, h / 2); ctx.quadraticCurveTo(-w / 2 - h * 0.25, 0, -w / 2, -h / 2); ctx.closePath(); };
+  path(); const g = ctx.createLinearGradient(-w / 2, 0, w / 2, 0); g.addColorStop(0, 'rgba(200,170,255,0.38)'); g.addColorStop(0.5, 'rgba(225,240,255,0.28)'); g.addColorStop(1, 'rgba(170,215,255,0.38)');
+  ctx.fillStyle = g; ctx.fill(); ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 1.2; ctx.shadowColor = 'rgba(210,200,255,0.9)'; ctx.shadowBlur = 10; ctx.stroke(); ctx.shadowBlur = 0;
+  ctx.save(); path(); ctx.clip();
+  const sy = ((t * 0.8) % 1) * h * 1.4 - h * 0.7; ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(-w / 2, sy, w, 2);                  // scan line
+  ctx.globalAlpha = visorAmt * 0.5; ctx.fillStyle = 'rgba(255,255,255,0.7)'; for (let x = -w / 2 + 6; x < w / 2; x += 6) ctx.fillRect(x, h / 2 - 4, 1, 2);
+  ctx.restore();
+  ctx.font = `500 ${Math.max(8, h * 0.18)}px "IBM Plex Mono", monospace`; ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  ctx.fillText('DREAM · ' + String(Math.floor(t * 10) % 1000).padStart(3, '0'), -w / 2 + h * 0.2, -h / 2 + h * 0.12);
+  ctx.restore();
+}
+
+/* ---------- 🌸 Petals: both index fingers up ---------- */
+const petals = [];
+let petalUntil = 0;
+function updatePetals(now, dt) {
+  const on = now < petalUntil;
+  if (on && petals.length < 90 && Math.random() < 0.6) petals.push({ x: rand(-0.05, 1.05) * W, y: -20, vx: rand(-0.4, 0.6), vy: rand(0.6, 1.5), r: rand(5, 10), rot: rand(0, 6), vr: rand(-0.04, 0.04), ph: rand(0, 6), col: pick(['255,196,214', '255,214,226', '252,180,204', '255,232,238']) });
+  for (const p of petals) { p.ph += 0.03; p.x += (p.vx + Math.sin(p.ph) * 0.6) * dt * 60; p.y += p.vy * dt * 60; p.rot += p.vr * dt * 60; }
+  for (let i = petals.length - 1; i >= 0; i--) if (petals[i].y > H + 30) petals.splice(i, 1);
+}
+function drawPetals() {
+  for (const p of petals) {
+    ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.scale(1, 0.55 + 0.45 * Math.abs(Math.sin(p.ph * 1.7)));
+    const g = ctx.createLinearGradient(0, -p.r, 0, p.r); g.addColorStop(0, `rgba(${p.col},0.95)`); g.addColorStop(1, 'rgba(255,240,245,0.85)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(0, -p.r); ctx.bezierCurveTo(p.r * 0.9, -p.r * 0.6, p.r * 0.7, p.r * 0.7, 0, p.r); ctx.bezierCurveTo(-p.r * 0.7, p.r * 0.7, -p.r * 0.9, -p.r * 0.6, 0, -p.r); ctx.fill();
+    ctx.restore();
+  }
+}
+const pick = a => a[(Math.random() * a.length) | 0];
+
+/* ---------- 🎞 Black-and-white film (one open hand beside your face) and 🌑 lights out (a hand right up to the camera) ---------- */
+let bwAmt = 0, bwUntil = 0, darkAmt = 0, darkUntil = 0;
+const grainC = document.createElement('canvas'); grainC.width = grainC.height = 160;
+{ const g = grainC.getContext('2d'), im = g.createImageData(160, 160); for (let i = 0; i < im.data.length; i += 4) { const v = Math.random() * 255; im.data[i] = im.data[i + 1] = im.data[i + 2] = v; im.data[i + 3] = 40; } g.putImageData(im, 0, 0); }
+function drawFilm(t) {
+  if (bwAmt < 0.02) return;
+  ctx.save(); ctx.globalAlpha = bwAmt; ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.filter = 'grayscale(1) contrast(1.18) brightness(1.04)'; ctx.drawImage(canvas, 0, 0); ctx.restore();
+  ctx.save(); ctx.globalAlpha = bwAmt * 0.7; ctx.globalCompositeOperation = 'overlay'; const ox = Math.random() * 160, oy = Math.random() * 160; ctx.translate(-ox, -oy); ctx.fillStyle = ctx.createPattern(grainC, 'repeat'); ctx.fillRect(0, 0, W + 160, H + 160); ctx.restore();
+  const vg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.75); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, `rgba(0,0,0,${0.35 * bwAmt})`);
+  ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
+}
+function drawDark() {
+  if (darkAmt < 0.02) return;
+  ctx.save(); ctx.fillStyle = `rgba(8,10,16,${0.86 * darkAmt})`; ctx.fillRect(0, 0, W, H); ctx.restore();
+}
+
 /* ---------- Gestures → scenes ---------- */
 const scene = { sky: 0, wire: 0, aura: 0 }, sceneUntil = { sky: 0, wire: 0, aura: 0 };
 let lastTip = null, lastDropAt = 0, holdFlat = 0, holdUp = 0, holdFist = 0, holdVanish = 0;
 const vanish = { t0: -1e9, parts: [] };
+let holdVisor = 0;
 function updateGestures(hands, now, dt) {
   const vanishing = now - vanish.t0 < 5200;
-  const pt = hands.find(h => h.point);
-  if (pt) {
-    const tip = pt.p[8];
+  const fc = faceBox, fw = fc ? fc.w : W * 0.15;
+  // ☝️☝️ both index fingers up → petals;  ☝️ one finger → a water drop
+  const pts = hands.filter(h => h.point);
+  if (pts.length === 2) { petalUntil = now + 2500; say('Petals'); lastTip = null; }
+  else if (pts.length === 1) {
+    const pt = pts[0], tip = pt.p[8];
     if (!lastTip || now - lastDropAt > 1100 || dist(tip, lastTip) > pt.size * 1.1) { addRipple(tip.x, tip.y, 1); lastDropAt = now; lastTip = { x: tip.x, y: tip.y }; say('Water drop'); }
   } else lastTip = null;
   const ups = hands.filter(h => h.up), flats = hands.filter(h => h.flat), fists = hands.filter(h => h.fist);
-  const headY = faceBox ? faceBox.chin.y : H * 0.45;
-  const handsHigh = ups.length === 2 && ups.every(h => h.p[0].y < headY + (faceBox ? faceBox.h * 0.2 : 0)) && dist(ups[0].c, ups[1].c) > (faceBox ? faceBox.w * 1.8 : W * 0.25);
+  // 🙌 both palms up beside your head (wrists above the chin) → vanish
+  const headY = fc ? fc.chin.y : H * 0.45;
+  const handsHigh = ups.length === 2 && ups.every(h => h.p[0].y < headY + (fc ? fc.h * 0.2 : 0)) && dist(ups[0].c, ups[1].c) > fw * 1.8;
   holdVanish = handsHigh ? holdVanish + dt : 0;
   if (holdVanish > 0.5 && !vanishing && now - vanish.t0 > 6500 && haveMask) startVanish(now);
+  // 🤲 flat hands → wireframe mountains
   holdFlat = flats.length ? holdFlat + dt : 0;
   if (holdFlat > 0.25) {
     sceneUntil.wire = now + 2500; say('Lift your hands — raise the mountains');
     wireBumps = flats.map(h => { const z = 3.2; return { x: (h.c.x - W / 2) / (Math.min(W, H) * 0.9) * z, z, h: clamp((H * 0.95 - h.c.y) / H, 0, 1) * 2.4 }; });
   }
-  holdUp = ups.length && !handsHigh ? holdUp + dt : 0;
-  if (holdUp > 0.2 && !vanishing) { sceneUntil.sky = now + 3500; say('The doves follow your hand'); }
-  holdFist = fists.length === 2 ? holdFist + dt : 0;
+  // 🖐🖐 two open palms raised (lower than the vanish pose) → sky and doves
+  holdUp = ups.length === 2 && !handsHigh ? holdUp + dt : 0;
+  if (holdUp > 0.2 && !vanishing) { sceneUntil.sky = now + 3500; say('The doves follow your hands'); }
+  // 🖐 one open hand right beside your face → black-and-white film
+  const byFace = hands.filter(h => h.open && fc && dist(h.c, fc.c) < fw * 1.7);
+  if (byFace.length === 1 && ups.length < 2) { bwUntil = now + 1400; say('Film'); }
+  // ✋ a hand right up to the camera → lights out
+  if (hands.some(h => h.open && h.size > (fc ? fw * 1.6 : Math.min(W, H) * 0.32))) { darkUntil = now + 700; say('Lights out'); }
+  // ✊✊ fists by your chin → visor (and petals);  fists further out → glow
+  const chinFists = fists.filter(h => fc && dist(h.c, fc.chin) < fw * 2.1);
+  holdVisor = chinFists.length === 2 ? holdVisor + dt : 0;
+  if (holdVisor > 0.3) { visorUntil = now + 4500; petalUntil = Math.max(petalUntil, now + 2000); say('Visor'); }
+  holdFist = fists.length === 2 && chinFists.length < 2 ? holdFist + dt : 0;
   if (holdFist > 0.3) { sceneUntil.aura = now + 2500; say('Glow'); }
+  // 😮 breathe out on the glass ("haa" / "hoo", held a moment) → fog you can wipe with your hand
+  if (mouthOpenAmt > 1) { if (!mouthSince) mouthSince = now; if (now - mouthSince > 450) { startFog(now); say('Wipe the mist with your hand'); } } else mouthSince = 0;
+  updateFog(now, dt); updateCards(now, dt); updatePetals(now, dt);
+  bwAmt = lerp(bwAmt, now < bwUntil ? 1 : 0, ease(dt, now < bwUntil ? 5 : 3));
+  visorAmt = lerp(visorAmt, now < visorUntil ? 1 : 0, ease(dt, now < visorUntil ? 6 : 3));
+  darkAmt = lerp(darkAmt, now < darkUntil ? 1 : 0, ease(dt, now < darkUntil ? 6 : 2.5));
   const order = Object.keys(scene).sort((a, b) => sceneUntil[b] - sceneUntil[a]);
   for (const k of Object.keys(scene)) { const on = !vanishing && now < sceneUntil[k] && k === order[0]; scene[k] = lerp(scene[k], on ? 1 : 0, ease(dt, on ? 3 : 1.6)); }
 }
@@ -486,13 +693,18 @@ function detect(now) {
       const lm = r.faceLandmarks && r.faceLandmarks[0];
       if (bs && lm) {
         const g = n => (bs.find(c => c.categoryName === n) || { score: 0 }).score;
-        const blink = (g('eyeBlinkLeft') + g('eyeBlinkRight')) / 2;
+        const blink = (g('eyeBlinkLeft') + g('eyeBlinkRight')) / 2; lastBlink = blink; lastSquint = (g('eyeSquintLeft') + g('eyeSquintRight')) / 2; lastLook = (g('eyeLookDownLeft') + g('eyeLookDownRight')) / 2;
         const closed = eyesClosed ? blink > 0.35 : blink > 0.5;
         if (closed && !eyesClosed) eyesClosedSince = now;
         if (!closed && eyesClosed) eyesOpenSince = now;
         eyesClosed = closed;
         const top = toScreen(lm[10]), chin = toScreen(lm[152]), l = toScreen(lm[234]), rr = toScreen(lm[454]);
-        faceBox = { top, chin, w: dist(l, rr), h: dist(top, chin), c: { x: (top.x + chin.x) / 2, y: (top.y + chin.y) / 2 } };
+        faceBox = { top, chin, w: dist(l, rr), h: dist(top, chin), c: { x: (top.x + chin.x) / 2, y: (top.y + chin.y) / 2 }, eL: toScreen(lm[33]), eR: toScreen(lm[263]) };
+        // breathing on the glass: jaw open ("haa") or a rounded "hoo", measured against your own resting face (some lips read as 'pucker' at rest, so pucker is not used)
+        const jaw = g('jawOpen'), fun = g('mouthFunnel');
+        mouthBase.j = Math.min(lerp(mouthBase.j, jaw, 0.02), jaw + 0.02); mouthBase.f = Math.min(lerp(mouthBase.f, fun, 0.02), fun + 0.02);
+        mouthOpenAmt = Math.max((jaw - mouthBase.j) / 0.35, (fun - mouthBase.f) / 0.3);
+        lastMouth = [g('jawOpen'), g('mouthFunnel'), g('mouthPucker')].map(v => +v.toFixed(2));
       } else eyesClosed = false;
     } catch (e) { }
   }
@@ -519,11 +731,13 @@ function updateBackground() {
   snx.globalAlpha = 0.25; snx.drawImage(bgC, 0, 0); snx.globalAlpha = 1;    // slowly remember what is really behind you
   fcx.drawImage(seenC, 0, 0); fcx.drawImage(bgC, 0, 0);
 }
-function cutout() {
+function cutout(tint, tintA) {
   const pw = 960, ph = Math.round(960 * vh / vw);
   if (personC.width !== pw || personC.height !== ph) { personC.width = pw; personC.height = ph; }
   pcx.globalCompositeOperation = 'source-over'; pcx.clearRect(0, 0, pw, ph); pcx.drawImage(video, 0, 0, pw, ph);
-  pcx.globalCompositeOperation = 'destination-in'; pcx.drawImage(maskC, 0, 0, pw, ph);
+  pcx.globalCompositeOperation = 'destination-in'; pcx.filter = 'blur(3px)'; pcx.drawImage(maskC, 0, 0, pw, ph); pcx.filter = 'none';   // a soft, feathered edge
+  if (tint) { pcx.globalCompositeOperation = 'source-atop'; pcx.globalAlpha = tintA; pcx.fillStyle = tint; pcx.fillRect(0, 0, pw, ph); pcx.globalAlpha = 1; }   // take on the scene's light
+  pcx.globalCompositeOperation = 'source-over';
   return personC;
 }
 const silC = document.createElement('canvas');
@@ -549,11 +763,11 @@ function drawVanish(now) {
   const va = (now - vanish.t0) / 1000; if (va < 0 || va > 5.2 || !haveMask) return;
   const room = smooth(0.9, 1.6, va) * (1 - smooth(4.0, 5.0, va));
   const sil = smooth(0, 0.45, va) * (1 - smooth(1.0, 1.8, va));
-  if (room > 0) { ctx.save(); ctx.globalAlpha = room; drawMirrored(fillC, 'saturate(1.04) brightness(1.04) contrast(1.02)'); ctx.restore();
+  if (room > 0) { ctx.save(); ctx.globalAlpha = room; drawMirrored(fillC, 'saturate(1.04) brightness(1.04) contrast(1.02) blur(1.5px)'); ctx.restore();
     ctx.save(); ctx.globalCompositeOperation = 'soft-light'; ctx.globalAlpha = 0.22 * room; ctx.fillStyle = '#bcd3f0'; ctx.fillRect(0, 0, W, H); ctx.restore(); }
   if (sil > 0) {
     ctx.save(); ctx.globalAlpha = sil * 0.35; ctx.fillStyle = '#6f8fbf'; ctx.globalCompositeOperation = 'multiply'; ctx.fillRect(0, 0, W, H); ctx.restore();
-    ctx.save(); ctx.globalAlpha = sil; ctx.shadowColor = 'rgba(255,255,255,0.9)'; ctx.shadowBlur = 24; drawMirrored(silhouette()); ctx.restore();
+    ctx.save(); ctx.globalAlpha = sil * 0.94; ctx.shadowColor = 'rgba(255,255,255,0.95)'; ctx.shadowBlur = 30; drawMirrored(silhouette(), 'blur(2.5px)'); ctx.restore();
   }
   if (va > 1.0 && va < 4.2) {
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
@@ -577,7 +791,7 @@ function frame() {
   const wantDream = window.__forceDream || (eyesClosed ? now - eyesClosedSince > 250 : (now - eyesOpenSince < 1200 && dreamAmt > 0.3));
   dreamAmt = lerp(dreamAmt, wantDream ? 1 : 0, ease(dt, wantDream ? 2.5 : 1.5));
   if (dreamAmt > 0.4) say('Dreaming');
-  if (!hands.length && dreamAmt < 0.3 && now - statusAt > 2600) say(haveMask ? 'Point · raise a palm · flat hands · two fists · hands up' : 'Looking for you…');
+  if (!hands.length && dreamAmt < 0.3 && now - statusAt > 2600) say(haveMask ? 'Point · breathe · pinch · palms · fists · hands up' : 'Looking for you…');
   const palms = hands.filter(h => h.open).map(h => ({ x: h.c.x, y: h.c.y - h.size * 0.4, r: h.size * 1.5 }));
   updateBirds(dt, scene.sky > 0.2 ? palms : []);
   $('beatDot').style.transform = `scale(${1 + beat * 1.2})`; $('beatDot').style.background = analyser ? `rgba(170,205,255,${0.5 + beat * 0.5})` : 'rgba(255,255,255,.35)';
@@ -593,12 +807,17 @@ function frame() {
     if (haveMask && sceneMax > 0.01) {
       ctx.save();
       if (scene.aura > 0.01) { ctx.shadowColor = `rgba(200,225,255,${0.9 * scene.aura})`; ctx.shadowBlur = 40 * scene.aura; }
-      drawMirrored(cutout()); ctx.restore();
+      const tint = scene.sky >= scene.wire && scene.sky >= scene.aura ? ['#9fc4ff', 0.14 * scene.sky] : scene.wire > scene.aura ? ['#3a5aa0', 0.22 * scene.wire] : ['#8fb4ff', 0.18 * scene.aura];
+      ctx.globalAlpha = clamp(sceneMax * 1.5, 0, 1); drawMirrored(cutout(tint[0], tint[1]), 'brightness(1.03)'); ctx.restore();
+      // a soft haze over everything ties you and the new background together
+      ctx.save(); ctx.globalAlpha = 0.1 * sceneMax; ctx.globalCompositeOperation = 'screen'; ctx.fillStyle = tint[0]; ctx.fillRect(0, 0, W, H); ctx.restore();
     }
+    drawFilm(t);
+    drawVisor(t);
     drawDream(t, dreamAmt);
     drawVanish(now);
   }
-  drawBirds(scene.sky); drawHandLines(); drawGlints(); drawDrops(now);
+  drawCards(now, t); drawFog(t); drawPetals(); drawBirds(scene.sky); drawHandLines(); drawGlints(); drawDrops(now); drawDark();
   present(now);
 }
 
@@ -627,7 +846,7 @@ $('startBtn').onclick = async () => {
     if (!running) { running = true; requestAnimationFrame(frame); }
     setTimeout(() => { skyTex = skyTex || makeSky(); }, 50);
     await loadModels();
-    say('Point · raise a palm · flat hands · two fists · hands up');
+    say('Point · breathe · pinch · palms · fists · hands up');
   } catch (e) {
     console.error(e); $('start').style.display = 'flex'; btn.disabled = false; btn.textContent = 'Try again';
     $('err').textContent = 'Could not open the camera or load the models. Please allow camera access, check your internet connection, and use Chrome or Safari. (' + (e.message || e) + ')';
@@ -635,10 +854,14 @@ $('startBtn').onclick = async () => {
 };
 
 // for automated tests
-window.__ds = () => ({ hands: hands.length, flags: hands.map(h => (h.point ? 'P' : '') + (h.up ? 'U' : '') + (h.flat ? 'F' : '') + (h.fist ? 'X' : '') + (h.open ? 'O' : '')).join(','), sky: +scene.sky.toFixed(2), wire: +scene.wire.toFixed(2), aura: +scene.aura.toFixed(2), vanish: performance.now() - vanish.t0 < 5200, ripples: ripples.length, mask: haveMask, seg: !!segmenter, gl: !!gl, flip: flipY, dream: +dreamAmt.toFixed(2), status: statusMsg });
+window.__ds = () => ({ hands: hands.length, flags: hands.map(h => (h.point ? 'P' : '') + (h.up ? 'U' : '') + (h.flat ? 'F' : '') + (h.fist ? 'X' : '') + (h.open ? 'O' : '')).join(','), sky: +scene.sky.toFixed(2), wire: +scene.wire.toFixed(2), aura: +scene.aura.toFixed(2), vanish: performance.now() - vanish.t0 < 5200, ripples: ripples.length, mask: haveMask, mouth: lastMouth, fog: +fogAmt.toFixed(2), dreamA: +dreamAmt.toFixed(2), blink: +lastBlink.toFixed(2), squint: +lastSquint.toFixed(2), lookDown: +lastLook.toFixed(2), seg: !!segmenter, gl: !!gl, flip: flipY, dream: +dreamAmt.toFixed(2), status: statusMsg });
 window.__scene = k => { for (const q in sceneUntil) sceneUntil[q] = 0; if (k) sceneUntil[k] = performance.now() + 60000; };
 window.__vanish = () => startVanish(performance.now());
 window.__drop = (x, y) => addRipple(x * W, y * H, 1);
+window.__fog = () => startFog(performance.now());
+window.__cards = (n) => { for (let i = 0; i < n; i++) { const sl = cardSlot(cards.length); cards.push({ kind: MINI[cardN++ % MINI.length], x: sl.x, y: sl.y, w: Math.min(W, H) * 0.2, ang: 0, tx: sl.x, ty: sl.y, tw: Math.min(W, H) * 0.2, born: performance.now() - 1000, ph: Math.random() * 6 }); } };
+window.__pull = (on) => { pull = on ? { kind: MINI[cardN % MINI.length], born: performance.now() - 500, a: { x: W * 0.32, y: H * 0.62 }, b: { x: W * 0.62, y: H * 0.55 }, seen: performance.now() + 60000 } : null; };
+window.__fx = (k, ms) => { const u = performance.now() + (ms || 60000); if (k === 'bw') bwUntil = u; if (k === 'visor') visorUntil = u; if (k === 'petals') petalUntil = u; if (k === 'dark') darkUntil = u; };
 </script>
 </body>
 </html>
