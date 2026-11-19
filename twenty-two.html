@@ -67,8 +67,8 @@
     <h1>Twenty-Two <small>an AR birthday</small></h1>
     <div class="how">
       🦋 <b>Open your palm</b> — butterflies come out and sit on your fingertips<br>
-      ☝️ <b>Point one finger</b> — photo bubbles float up; poke them to pop<br>
-      🖼 <b>Make a frame</b> with both thumbs &amp; index fingers — a photo appears inside<br>
+      ☝️ <b>Point one finger</b> — bubbles float up (some hold your photos); poke them to pop<br>
+      🖼 <b>Make a frame</b> with both thumbs &amp; index fingers — each new frame is a different effect: a childhood photo, a polaroid snapshot of you, or a retro film window<br>
       ✌️✌️ <b>Two peace signs</b> — "2" + "2" balloons and a birthday cake<br>
       😌 <b>Close your eyes</b> — make a wish<br>
       🌬 <b>Blow ("hooo")</b> at the cake — candles out, confetti!<br>
@@ -320,9 +320,8 @@ let floatCount = 0;
 const EMOJIS = ['🎂', '🍰', '🎈', '🍓', '💖', '⭐', '🧁', '🎀', '🌷', '🍒'];
 function wordList() { return ['22', 'happy', $('wish1').value, $('wish2').value, '♡', 'love you'].filter(Boolean); }
 // mix of bubble types: photo / sticker / word / glitter / heart / plain
-// every third bubble is a big photo bubble (photos in order); the ones in between are small clear bubbles
 let photoTurn = 0;
-function pickType() { return (floatCount % 3 === 1 && photos.length) ? 'photo' : 'plain'; }
+function pickType() { return (floatCount % 5 === 2 && photos.length) ? 'photo' : 'plain'; }   // mostly clear bubbles, about 1 in 5 has a photo
 function popEffect(b) {
   if (b.type === 'emoji') confetti(b.x, b.y, 18, 0.6);
   else if (b.type === 'word') parts.push({ k: 't', x: b.x, y: b.y, vx: 0, vy: -0.9, life: 1, d: 0.012, text: b.word, size: b.R * 0.75 });
@@ -400,6 +399,46 @@ function drawFloaters() {
 
 /* ---------- 🖼 Finger frame ---------- */
 let frame = null, frameAmt = 0, frameIdx = -1, lastFrameAt = 0, frameStreak = 0;
+const FRAME_MODES = ['memory', 'snap', 'film'];     // each new frame switches to the next effect
+let frameMode = 'memory', memIdx = -1, frameSince = 0, snapped = false, flashAt = -1e9;
+const polaroids = [];
+const DATE_STAMP = (() => { const d = new Date(); return "'" + String(d.getFullYear()).slice(2) + ' ' + String(d.getMonth() + 1).padStart(2, ' ') + ' ' + String(d.getDate()).padStart(2, '0'); })();
+// draw the live (mirrored) camera so that it lines up with a screen rectangle
+function drawLive(x, y, w, h) { const c = cover(); ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip(); ctx.translate(W, 0); ctx.scale(-1, 1); ctx.drawImage(video, c.ox, c.oy, c.dw, c.dh); ctx.restore(); }
+function takeSnapshot(f, now) {
+  const w = f.x1 - f.x0, h = f.y1 - f.y0, img = document.createElement('canvas');
+  img.width = Math.max(1, Math.round(w)); img.height = Math.max(1, Math.round(h));
+  const g = img.getContext('2d'), c = cover();
+  g.translate(img.width, 0); g.scale(-1, 1);
+  g.drawImage(video, c.ox - (W - f.x1), c.oy - f.y0, c.dw, c.dh);   // the part of you inside the frame
+  const slot = polaroids.length % 6;
+  polaroids.push({ img, x: f.x0 + w / 2, y: f.y0 + h / 2, w, h, born: now,
+    tx: W * (0.1 + slot * 0.16), ty: H * 0.8 + (slot % 2) * 14, rot: rand(-0.18, 0.18) });
+  if (polaroids.length > 6) polaroids.shift();
+  flashAt = now; sparkle(f.x0 + w / 2, f.y0 + h / 2, 30, Math.max(w, h) / 2);
+}
+function drawPolaroids(now) {
+  for (const p of polaroids) {
+    const age = (now - p.born) / 1000, k = clamp((age - 0.4) / 1.2, 0, 1), e = k * k * (3 - 2 * k);
+    const size = lerp(Math.max(p.w, p.h), Math.min(W, H) * 0.17, e);
+    const x = lerp(p.x, p.tx, e), y = lerp(p.y, p.ty, e), r = lerp(0, p.rot, e);
+    const iw = size, ih = size * (p.h / p.w > 1.3 ? 1.3 : p.h / p.w < 0.75 ? 0.75 : p.h / p.w), pad = iw * 0.07;
+    ctx.save(); ctx.translate(x, y); ctx.rotate(r);
+    ctx.shadowColor = 'rgba(0,0,0,0.3)'; ctx.shadowBlur = 14; ctx.fillStyle = '#fffdf8';
+    ctx.fillRect(-iw / 2 - pad, -ih / 2 - pad, iw + pad * 2, ih + pad * 4.2); ctx.shadowBlur = 0;
+    const s = Math.max(iw / p.img.width, ih / p.img.height);
+    ctx.save(); ctx.beginPath(); ctx.rect(-iw / 2, -ih / 2, iw, ih); ctx.clip();
+    ctx.drawImage(p.img, -p.img.width * s / 2, -p.img.height * s / 2, p.img.width * s, p.img.height * s);
+    const dev = clamp(1 - age / 2.2, 0, 1);                      // the photo "develops" from white
+    if (dev > 0) { ctx.fillStyle = `rgba(250,248,240,${dev})`; ctx.fillRect(-iw / 2, -ih / 2, iw, ih); }
+    ctx.restore();
+    ctx.fillStyle = '#e0568f'; ctx.font = `700 ${pad * 2.2}px "Dancing Script", cursive`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('22 ♡', 0, ih / 2 + pad * 1.6);
+    ctx.restore();
+  }
+  const fk = (now - flashAt) / 350;                            // shutter flash
+  if (fk >= 0 && fk < 1) { ctx.save(); ctx.fillStyle = `rgba(255,255,255,${0.85 * (1 - fk)})`; ctx.fillRect(0, 0, W, H); ctx.restore(); }
+}
 function updateFrame(hands, now, dt) {
   const ls = hands.filter(h => h.ell);
   let box = null;
@@ -413,22 +452,51 @@ function updateFrame(hands, now, dt) {
   }
   frameStreak = box ? frameStreak + 1 : 0;
   if (box && frameStreak >= 2) {
-    if (frameAmt < 0.05 && now - lastFrameAt > 600) { frameIdx++; sparkle((box.x0 + box.x1) / 2, (box.y0 + box.y1) / 2, 20, 60); }
+    if (frameAmt < 0.05 && now - lastFrameAt > 600) { frameIdx++; frameMode = FRAME_MODES[frameIdx % FRAME_MODES.length]; if (frameMode === 'memory') memIdx++; frameSince = now; snapped = false; sparkle((box.x0 + box.x1) / 2, (box.y0 + box.y1) / 2, 20, 60); }
     lastFrameAt = now;
     frame = frame ? { x0: lerp(frame.x0, box.x0, ease(dt, 16)), y0: lerp(frame.y0, box.y0, ease(dt, 16)), x1: lerp(frame.x1, box.x1, ease(dt, 16)), y1: lerp(frame.y1, box.y1, ease(dt, 16)) } : box;
-    frameAmt = lerp(frameAmt, 1, ease(dt, 8)); say('🖼 A memory in your frame');
+    frameAmt = lerp(frameAmt, 1, ease(dt, 8));
+    if (frameMode === 'snap') {
+      if (!snapped && now - frameSince > 800 && frameAmt > 0.85) { snapped = true; takeSnapshot(frame, now); }
+      say(snapped ? '📸 Snap! Frame again for the next effect' : '📸 Hold still…');
+    } else say(frameMode === 'film' ? '🎞 Film window' : '🖼 A memory in your frame');
   } else if (now - lastFrameAt > 250) frameAmt = lerp(frameAmt, 0, ease(dt, 6));
 }
 function drawFrame(now) {
   if (!frame || frameAmt < 0.02) return;
   const { x0, y0, x1, y1 } = frame, w = x1 - x0, h = y1 - y0, pad = Math.min(w, h) * 0.06;
   ctx.save(); ctx.globalAlpha = frameAmt;
-  ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 18; ctx.fillStyle = '#fff';
-  ctx.fillRect(x0, y0, w, h); ctx.shadowBlur = 0;
-  ctx.save(); ctx.beginPath(); ctx.rect(x0 + pad, y0 + pad, w - pad * 2, h - pad * 2); ctx.clip();
-  const sc = 1 + (1 - frameAmt) * 0.15;
-  drawCover(photos[((frameIdx % (photos.length || 1)) + (photos.length || 1)) % (photos.length || 1)], x0 + pad - (sc - 1) * w / 2, y0 + pad - (sc - 1) * h / 2, (w - pad * 2) * sc, (h - pad * 2) * sc);
-  ctx.restore(); ctx.restore();
+  if (frameMode === 'memory') {             // 🖼 a childhood photo inside a white frame
+    ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 18; ctx.fillStyle = '#fff'; ctx.fillRect(x0, y0, w, h); ctx.shadowBlur = 0;
+    ctx.save(); ctx.beginPath(); ctx.rect(x0 + pad, y0 + pad, w - pad * 2, h - pad * 2); ctx.clip();
+    const sc = 1 + (1 - frameAmt) * 0.15, n = photos.length || 1;
+    drawCover(photos[((memIdx % n) + n) % n], x0 + pad - (sc - 1) * w / 2, y0 + pad - (sc - 1) * h / 2, (w - pad * 2) * sc, (h - pad * 2) * sc);
+    ctx.restore();
+  } else if (frameMode === 'snap') {        // 📸 camera viewfinder
+    const L = Math.min(w, h) * 0.18;
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.shadowColor = 'rgba(0,0,0,0.4)'; ctx.shadowBlur = 6;
+    for (const [cx, cy, sx, sy] of [[x0, y0, 1, 1], [x1, y0, -1, 1], [x0, y1, 1, -1], [x1, y1, -1, -1]]) { ctx.beginPath(); ctx.moveTo(cx, cy + sy * L); ctx.lineTo(cx, cy); ctx.lineTo(cx + sx * L, cy); ctx.stroke(); }
+    ctx.shadowBlur = 0;
+    if (!snapped) {
+      const k = clamp((now - frameSince) / 800, 0, 1);         // little countdown ring
+      ctx.beginPath(); ctx.arc((x0 + x1) / 2, (y0 + y1) / 2, Math.min(w, h) * 0.08, -Math.PI / 2, -Math.PI / 2 + k * Math.PI * 2); ctx.lineWidth = 4; ctx.stroke();
+    }
+    ctx.fillStyle = (now / 500 | 0) % 2 ? '#ff4d6d' : 'rgba(255,77,109,0.3)'; ctx.beginPath(); ctx.arc(x0 + pad * 1.4, y0 + pad * 1.4, pad * 0.45, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = `700 ${pad * 0.9}px -apple-system, sans-serif`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText('REC', x0 + pad * 2.1, y0 + pad * 1.42);
+  } else {                                  // 🎞 retro film window on the live camera
+    ctx.save(); ctx.filter = 'sepia(0.55) saturate(1.35) contrast(1.08) brightness(1.05)'; drawLive(x0, y0, w, h); ctx.restore();
+    ctx.save(); ctx.beginPath(); ctx.rect(x0, y0, w, h); ctx.clip();
+    const leak = ctx.createRadialGradient(x1, y0, 0, x1, y0, Math.max(w, h) * 0.7);   // light leak
+    leak.addColorStop(0, 'rgba(255,120,60,0.45)'); leak.addColorStop(1, 'rgba(255,120,60,0)'); ctx.fillStyle = leak; ctx.fillRect(x0, y0, w, h);
+    for (let i = 0; i < w * h / 900; i++) { ctx.fillStyle = `rgba(${Math.random() < 0.5 ? '255,255,255' : '0,0,0'},${Math.random() * 0.12})`; ctx.fillRect(x0 + Math.random() * w, y0 + Math.random() * h, 1.5, 1.5); }   // grain
+    const vg = ctx.createRadialGradient((x0 + x1) / 2, (y0 + y1) / 2, Math.min(w, h) * 0.3, (x0 + x1) / 2, (y0 + y1) / 2, Math.max(w, h) * 0.75);
+    vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(40,20,0,0.45)'); ctx.fillStyle = vg; ctx.fillRect(x0, y0, w, h);
+    ctx.font = `600 ${Math.max(12, Math.min(w, h) * 0.07)}px "Courier New", monospace`; ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
+    ctx.fillStyle = '#ff9a3c'; ctx.shadowColor = '#ff6a00'; ctx.shadowBlur = 8; ctx.fillText(DATE_STAMP, x1 - pad, y1 - pad * 0.6);
+    ctx.restore();
+    ctx.strokeStyle = 'rgba(30,20,15,0.9)'; ctx.lineWidth = pad * 0.6; ctx.strokeRect(x0, y0, w, h);
+  }
+  ctx.restore();
 }
 
 /* ---------- ✌️✌️ 22 balloons + cake ---------- */
@@ -596,7 +664,7 @@ function loop() {
   vg.addColorStop(0, 'rgba(255,190,220,0)'); vg.addColorStop(1, `rgba(150,70,140,${0.35 + beat * 0.15})`); ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
   ctx.save(); ctx.globalCompositeOperation = 'soft-light'; ctx.globalAlpha = 0.25; ctx.fillStyle = '#ffc3dc'; ctx.fillRect(0, 0, W, H); ctx.restore();
 
-  drawWish(t); drawCake(now, t); drawBalloons(now); drawFrame(now); drawFloaters(); drawButterflies(); drawParts();
+  drawWish(t); drawCake(now, t); drawBalloons(now); drawFrame(now); drawPolaroids(now); drawFloaters(); drawButterflies(); drawParts();
   if (cake && cake.state === 'out' && now - cake.outAt < 4000) {
     const k = (now - cake.outAt) / 4000, fs = Math.min(W * 0.07, 76);
     ctx.save(); ctx.globalAlpha = Math.min(1, (1 - k) * 2); ctx.textAlign = 'center'; ctx.font = `700 ${fs}px "Dancing Script", cursive`;
@@ -641,7 +709,7 @@ window.__tt = () => ({ hands: hands.length, open: hands.filter(h => h.open).leng
   bubbles: flies.filter(f => !f.free).length, flies: flies.length, point: hands.filter(h => h.point).length, floaters: floaters.length, frame: +frameAmt.toFixed(2), cake: cake ? cake.state : null, wish: +wishAmt.toFixed(2), eyesClosed, mouth: +mouthOpen.toFixed(2), photos: photos.length });
 window.__spawnAll = () => { ['photo','emoji','word','glitter','heart','plain'].forEach((type, i) => floaters.push({ x: W * (0.15 + i * 0.14), y: H * 0.45, vx: 0, vy: -0.05, R: Math.min(W, H) * 0.07, born: performance.now() - 1000, ph: i, type, photo: i, emoji: EMOJIS[i], word: wordList()[i % wordList().length], hue: i * 50, dots: Array.from({ length: 14 }, () => [rand(-0.7, 0.7), rand(-0.7, 0.7), rand(0, 6)]), popping: 0 })); };
 window.__popAll = () => { for (const b of floaters) if (!b.popping) { b.popping = 0.01; popEffect(b); } };
-window.__showFrame = () => { frame = { x0: W * 0.55, y0: H * 0.25, x1: W * 0.85, y1: H * 0.65 }; frameAmt = 1; lastFrameAt = performance.now() + 4000; frameIdx = 2; };
+window.__showFrame = (mode) => { frame = { x0: W * 0.55, y0: H * 0.25, x1: W * 0.85, y1: H * 0.65 }; frameAmt = 1; lastFrameAt = performance.now() + 6000; frameMode = mode || 'memory'; memIdx = 2; frameSince = performance.now(); snapped = false; };
 window.__spawnCake = () => { lastPeaceFire = 0; balloons.push({ x: W * 0.4, y: H * 0.6, vy: -1.2, born: performance.now(), ph: 0, col: ['#ffb3d1', '#ff6fa8'] }, { x: W * 0.6, y: H * 0.6, vy: -1.2, born: performance.now(), ph: 2, col: ['#b9a3ff', '#8a63ff'] }); cake = { state: 'lit', born: performance.now() - 1500, outAt: 0 }; };
 </script>
 </body>
