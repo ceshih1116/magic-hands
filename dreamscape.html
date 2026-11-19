@@ -48,12 +48,13 @@
 
 <div id="start">
   <h1>☁️ Dreamscape ☁️</h1>
-  <p>👋 Wave your hand and the birds fly that way<br>
-     🔄 Turn your wrist and the flock turns with it<br>
-     🖐 Open your palm and a mountain ridge grows from your palm lines<br>
-     ✋ Spread your fingers wider and another layer of mountains appears far away<br>
-     😌 Close your eyes and misty blue wings grow from your shoulders<br>
-     🎵 Turn on music sync and everything pulses with the beat</p>
+  <p>☝️ Point one finger (or tap the screen) — a water drop ripples across the glass<br>
+     🖐 Raise an open palm — blue sky, and the birds circle your hand<br>
+     🤲 Hold your hands flat, palms down — a wireframe mountain world rises under them<br>
+     ✊✊ Raise two fists — a blue glow with rays of light<br>
+     🙌 Lift both hands beside your head — you turn into a white silhouette and vanish<br>
+     😌 Close your eyes — misty blue wings<br>
+     🎵 Music sync — everything pulses with the beat</p>
   <button id="startBtn">Turn on camera</button>
   <div id="err"></div>
 </div>
@@ -69,31 +70,33 @@ const $ = id => document.getElementById(id);
 const canvas = $('c'), ctx = canvas.getContext('2d');
 const video = $('video');
 let W = 0, H = 0; const DPR = Math.min(window.devicePixelRatio || 1, 2);
-function resize() { W = innerWidth; H = innerHeight; canvas.width = W * DPR; canvas.height = H * DPR; ctx.setTransform(DPR, 0, 0, DPR, 0, 0); }
+const snapC = document.createElement('canvas'), scx = snapC.getContext('2d');
+function resize() { W = innerWidth; H = innerHeight; canvas.width = W * DPR; canvas.height = H * DPR; ctx.setTransform(DPR, 0, 0, DPR, 0, 0); snapC.width = canvas.width; snapC.height = canvas.height; }
 addEventListener('resize', resize); resize();
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, k) => a + (b - a) * k;
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const ease = (dt, rate) => 1 - Math.exp(-dt * rate);
 
 /* ---------- UI ---------- */
 $('eyeBtn').onclick = () => document.body.classList.toggle('hide-ui');
 $('fsBtn').onclick = () => { try { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); } catch (e) { } };
 addEventListener('keydown', e => { if (e.key === 'h' || e.key === 'H') document.body.classList.toggle('hide-ui'); });
+// tap / click the screen → a water drop
+canvas.addEventListener('pointerdown', e => addRipple(e.clientX, e.clientY, 1));
 
 /* ---------- Camera → screen mapping (cover fit, mirrored) ---------- */
 let vw = 1280, vh = 720;
 function cover() { const s = Math.max(W / vw, H / vh); const dw = vw * s, dh = vh * s; return { s, dw, dh, ox: (W - dw) / 2, oy: (H - dh) / 2 }; }
 function toScreen(lm) { const c = cover(); return { x: W - (c.ox + lm.x * c.dw), y: c.oy + lm.y * c.dh }; }
+function drawMirrored(img, filter) { const c = cover(); ctx.save(); if (filter) ctx.filter = filter; ctx.translate(W, 0); ctx.scale(-1, 1); ctx.drawImage(img, c.ox, c.oy, c.dw, c.dh); ctx.restore(); }
 
 /* ---------- Beat detection from the microphone ---------- */
 let audioCtx = null, analyser = null, freq = null, micStream = null, beatAvg = 0, lastBeat = 0, beat = 0;
 $('musicBtn').onclick = async () => {
-  if (analyser) { // turn off
-    micStream.getTracks().forEach(t => t.stop()); audioCtx.close(); analyser = null; micStream = null;
-    $('musicBtn').classList.remove('on'); return;
-  }
+  if (analyser) { micStream.getTracks().forEach(t => t.stop()); audioCtx.close(); analyser = null; micStream = null; $('musicBtn').classList.remove('on'); return; }
   try {
     micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -107,110 +110,153 @@ function updateBeat(now) {
   beat *= 0.9;
   if (!analyser) return;
   analyser.getByteFrequencyData(freq);
-  let e = 0; for (let i = 1; i < 8; i++) e += freq[i]; e /= 7;          // bass energy (~40–350 Hz)
+  let e = 0; for (let i = 1; i < 8; i++) e += freq[i]; e /= 7;
   beatAvg = beatAvg * 0.95 + e * 0.05;
   if (e > beatAvg * 1.25 && e > 60 && now - lastBeat > 280) { lastBeat = now; beat = 1; onBeat(); }
 }
 
-/* ---------- Scenery: sky, clouds, layered mountains ---------- */
-const MAX_LAYERS = 6, BASE_LAYERS = 2;
-const layers = [];
-for (let d = 0; d < MAX_LAYERS; d++) {
-  const far = d / (MAX_LAYERS - 1);
-  layers.push({
-    d, alpha: d < BASE_LAYERS ? 1 : 0,
-    base: lerp(0.80, 0.50, far), amp: lerp(0.13, 0.07, far),
-    col: [lerp(44, 205, far), lerp(92, 226, far), lerp(140, 246, far)],
-    seeds: Array.from({ length: 4 }, () => [rand(0.6, 2.4), rand(0, 6.28), rand(0.3, 1)]),
-    drift: lerp(6, 1.5, far), off: rand(0, 1000)
-  });
-}
-function ridgeY(L, x, t) {
-  const u = (x + L.off + t * L.drift) / W;
-  let y = 0, n = 0;
-  for (const [f, p, a] of L.seeds) { y += Math.sin(u * Math.PI * 2 * f * 2 + p) * a; n += a; }
-  y += Math.sin(u * 37 + L.seeds[0][1]) * 0.12;                         // small jagged peaks
-  return H * (L.base - L.amp * (0.5 + 0.5 * y / n));
-}
-const clouds = Array.from({ length: 6 }, () => ({ x: rand(0, 1), y: rand(0.08, 0.38), s: rand(0.6, 1.4), v: rand(0.004, 0.012) }));
-function drawSky(t) {
-  const g = ctx.createLinearGradient(0, 0, 0, H);
-  g.addColorStop(0, '#2f6fc4'); g.addColorStop(0.45, '#7fb8ec'); g.addColorStop(0.75, '#cfe6f7'); g.addColorStop(1, '#f6d9e8');
-  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-  const sx = W * 0.78, sy = H * 0.2, sr = Math.min(W, H) * (0.32 + beat * 0.04);
-  const sg = ctx.createRadialGradient(sx, sy, 0, sx, sy, sr);
-  sg.addColorStop(0, 'rgba(255,250,235,0.85)'); sg.addColorStop(0.25, 'rgba(255,240,220,0.35)'); sg.addColorStop(1, 'rgba(255,240,220,0)');
-  ctx.fillStyle = sg; ctx.fillRect(0, 0, W, H);
-  for (const c of clouds) {
-    c.x += c.v / 60; if (c.x > 1.3) c.x = -0.3;
-    const cx = c.x * W, cy = c.y * H, r = 60 * c.s * Math.min(1.5, W / 900);
-    ctx.save(); ctx.globalAlpha = 0.55; ctx.fillStyle = '#ffffff'; ctx.filter = 'blur(8px)';
-    for (const [dx, dy, rr] of [[0, 0, 1], [0.9, 0.15, 0.8], [-0.9, 0.2, 0.75], [0.4, -0.35, 0.7], [-0.4, -0.3, 0.65]]) {
-      ctx.beginPath(); ctx.ellipse(cx + dx * r, cy + dy * r, rr * r, rr * r * 0.62, 0, 0, Math.PI * 2); ctx.fill();
+/* ---------- 💧 Water ripples: a drop on the glass that bends the picture underneath ---------- */
+const ripples = [];
+function addRipple(x, y, power = 1) { if (ripples.length < 8) ripples.push({ x, y, born: performance.now(), p: power, R: Math.min(W, H) * rand(0.16, 0.22) * power }); spark(x, y, 6, 8); }
+function drawRipples(now) {
+  if (!ripples.length) return;
+  scx.setTransform(1, 0, 0, 1, 0, 0); scx.clearRect(0, 0, snapC.width, snapC.height); scx.drawImage(canvas, 0, 0);
+  for (let i = ripples.length - 1; i >= 0; i--) {
+    const r = ripples[i], age = (now - r.born) / 1000, life = 2.2;
+    if (age > life) { ripples.splice(i, 1); continue; }
+    const fade = 1 - age / life, front = r.R * (0.15 + age * 0.75);
+    // rings of glass, each one bulging (magnifying) or dipping (shrinking) the picture a little
+    const N = 7, band = Math.max(5, r.R * 0.075);
+    for (let k = 0; k < N; k++) {
+      const outer = front - k * band, inner = outer - band; if (inner <= 1) break;
+      const amp = 0.13 * fade * (1 - k / N) * r.p, sc = 1 + amp * Math.sin(k * 1.9 + age * 6);
+      ctx.save(); ctx.beginPath(); ctx.arc(r.x, r.y, outer, 0, Math.PI * 2); ctx.arc(r.x, r.y, inner, 0, Math.PI * 2, true); ctx.clip();
+      ctx.translate(r.x, r.y); ctx.scale(sc, sc); ctx.translate(-r.x, -r.y);
+      ctx.drawImage(snapC, 0, 0, snapC.width, snapC.height, 0, 0, W, H);
+      ctx.restore();
+      // highlight on the top-left of each ring, shadow on the bottom-right
+      ctx.save(); ctx.lineWidth = Math.max(0.8, band * 0.22);
+      ctx.strokeStyle = `rgba(255,255,255,${0.85 * fade * (1 - k / N)})`; ctx.beginPath(); ctx.arc(r.x, r.y, outer - band * 0.3, Math.PI * 0.95, Math.PI * 1.75); ctx.stroke();
+      ctx.strokeStyle = `rgba(20,40,60,${0.35 * fade * (1 - k / N)})`; ctx.beginPath(); ctx.arc(r.x, r.y, outer - band * 0.6, Math.PI * -0.05, Math.PI * 0.75); ctx.stroke();
+      ctx.restore();
     }
-    ctx.restore();
-  }
-}
-function drawMountains(t) {
-  for (let d = MAX_LAYERS - 1; d >= 0; d--) {
-    const L = layers[d]; if (L.alpha < 0.01) continue;
-    const rise = (1 - L.alpha) * H * 0.08;
-    const [r, g, b] = L.col, glow = beat * 30;
-    ctx.save(); ctx.globalAlpha = L.alpha;
-    ctx.beginPath(); ctx.moveTo(0, H);
-    for (let x = 0; x <= W + 8; x += 8) ctx.lineTo(x, ridgeY(L, x, t) + rise);
-    ctx.lineTo(W, H); ctx.closePath();
-    const top = H * (L.base - L.amp);
-    const mg = ctx.createLinearGradient(0, top, 0, H);
-    mg.addColorStop(0, `rgb(${Math.min(255, r + 25 + glow)},${Math.min(255, g + 25 + glow)},${Math.min(255, b + 20 + glow)})`);
-    mg.addColorStop(1, `rgb(${r * 0.75},${g * 0.8},${b * 0.85})`);
-    ctx.fillStyle = mg; ctx.fill();
-    // misty light on the ridge line
-    ctx.strokeStyle = `rgba(255,255,255,${0.25 + beat * 0.4})`; ctx.lineWidth = 1.5; ctx.stroke();
-    // haze between layers
-    const hz = ctx.createLinearGradient(0, top, 0, top + H * 0.12);
-    hz.addColorStop(0, 'rgba(235,245,255,0.0)'); hz.addColorStop(1, 'rgba(235,245,255,0.18)');
-    ctx.fillStyle = hz; ctx.fill();
-    ctx.restore();
+    // the drop itself: a little glassy bead at the centre for the first moment
+    if (age < 0.6) {
+      const k = 1 - age / 0.6, br = r.R * 0.09 * k;
+      ctx.save(); ctx.beginPath(); ctx.arc(r.x, r.y, br, 0, Math.PI * 2); ctx.clip();
+      ctx.translate(r.x, r.y); ctx.scale(1.35, 1.35); ctx.translate(-r.x, -r.y); ctx.drawImage(snapC, 0, 0, snapC.width, snapC.height, 0, 0, W, H); ctx.restore();
+      ctx.save(); ctx.strokeStyle = `rgba(255,255,255,${0.8 * k})`; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(r.x, r.y, br, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = `rgba(255,255,255,${0.9 * k})`; ctx.beginPath(); ctx.arc(r.x - br * 0.35, r.y - br * 0.35, br * 0.22, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    }
   }
 }
 
-/* ---------- Birds (a small flock that follows your hand) ---------- */
-let flockDir = -0.4, flockSpeed = 1;          // radians; default: up and to the right
-const birds = Array.from({ length: 26 }, () => ({
-  x: rand(0, 1), y: rand(0.3, 0.6), vx: 0, vy: 0, ph: rand(0, 6.28), s: rand(0.7, 1.25), flap: 1
-}));
-for (const b of birds) { b.x *= innerWidth; b.y *= innerHeight; b.vx = Math.cos(flockDir) * 2; b.vy = Math.sin(flockDir) * 2; }
-function updateBirds(dt) {
-  const sp = 2.2 * flockSpeed * (1 + beat * 0.6);
-  const dx = Math.cos(flockDir), dy = Math.sin(flockDir);
-  for (const b of birds) {
-    let sx = 0, sy = 0, n = 0, ax = 0, ay = 0;
-    for (const o of birds) {
-      if (o === b) continue; const ddx = b.x - o.x, ddy = b.y - o.y, d2 = ddx * ddx + ddy * ddy;
-      if (d2 < 900) { sx += ddx / (d2 + 1); sy += ddy / (d2 + 1); }
-      if (d2 < 14000) { ax += o.vx; ay += o.vy; n++; }
+/* ---------- Scenes ---------- */
+// room (your real room) is the default; the others fade in while you hold their gesture
+const scene = { sky: 0, wire: 0, aura: 0 };
+const sceneUntil = { sky: 0, wire: 0, aura: 0 };
+const clouds = Array.from({ length: 7 }, () => ({ x: rand(0, 1), y: rand(0.06, 0.5), s: rand(0.6, 1.5), v: rand(0.004, 0.012) }));
+function drawSky(t, a) {
+  ctx.save(); ctx.globalAlpha = a;
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#3d6fd8'); g.addColorStop(0.5, '#6f9ef0'); g.addColorStop(1, '#a9c8f5');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  for (const c of clouds) {
+    c.x += c.v / 60; if (c.x > 1.3) c.x = -0.3;
+    const cx = c.x * W, cy = c.y * H, r = 70 * c.s * Math.min(1.6, W / 900);
+    ctx.save(); ctx.globalAlpha = a * 0.5; ctx.fillStyle = '#ffffff'; ctx.filter = 'blur(14px)';
+    for (const [dx, dy, rr] of [[0, 0, 1], [0.9, 0.15, 0.8], [-0.9, 0.2, 0.75], [0.4, -0.35, 0.7], [-0.4, -0.3, 0.65]]) {
+      ctx.beginPath(); ctx.ellipse(cx + dx * r, cy + dy * r, rr * r, rr * r * 0.55, 0, 0, Math.PI * 2); ctx.fill();
     }
-    let tx = dx * sp, ty = dy * sp;
-    if (n) { tx = tx * 0.7 + (ax / n) * 0.3; ty = ty * 0.7 + (ay / n) * 0.3; }
-    b.vx += (tx - b.vx) * 0.04 + sx * 2; b.vy += (ty - b.vy) * 0.04 + sy * 2;
-    b.x += b.vx * dt * 60; b.y += b.vy * dt * 60;
-    b.ph += (0.18 + beat * 0.25) * b.flap * dt * 60;
-    const m = 60;                                   // wrap around the screen edges
-    if (b.x < -m) b.x = W + m; if (b.x > W + m) b.x = -m;
-    if (b.y < -m) b.y = H * 0.7; if (b.y > H * 0.8) b.y = -m * 0.5;
+    ctx.restore();
+  }
+  ctx.restore();
+}
+// wireframe mountains: a perspective mesh whose peaks rise under your hands
+function terrainH(x, z, t) {
+  let h = 0;
+  const ridge = Math.sin(x * 0.55 + 1.3) * 0.55 + Math.sin(x * 1.3 + z * 0.4) * 0.3 + Math.abs(Math.sin(x * 2.9 - z * 0.9)) * 0.35;
+  h += Math.max(0, ridge) * clamp((z - 2.2) / 3, 0, 1) * 2.6;                     // a flat grid floor near you, mountains further back
+  for (const b of wireBumps) { const dx = x - b.x, dz = z - b.z; h += b.h * Math.exp(-(dx * dx) / 0.35 - (dz * dz) / 3.5); }
+  return h * (1 + beat * 0.15);
+}
+let wireBumps = [];
+function drawWire(t, a) {
+  ctx.save(); ctx.globalAlpha = a;
+  const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#0b1633'); g.addColorStop(0.55, '#14254f'); g.addColorStop(1, '#22376a');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  for (let i = 0; i < 70; i++) { const x = (i * 137.5 % 100) / 100 * W, y = (i * 61.8 % 45) / 100 * H; ctx.fillStyle = `rgba(220,235,255,${0.3 + 0.3 * Math.sin(t * 2 + i)})`; ctx.fillRect(x, y, 1.4, 1.4); }
+  const horizon = H * 0.46, f = Math.min(W, H) * 0.9, camH = 1.25, X = 4.2, NX = 44, Z0 = 1.1, Z1 = 9, NZ = 30, scroll = (t * 0.25) % ((Z1 - Z0) / NZ);
+  const P = (x, z) => { const h = terrainH(x, z, t); return { x: W / 2 + x / z * f, y: horizon + (camH - h) / z * f }; };
+  ctx.lineWidth = 0.8; ctx.lineJoin = 'round';
+  for (let j = NZ; j >= 0; j--) {                                // rows, far → near
+    const z = Z0 + j * (Z1 - Z0) / NZ - scroll, fade = clamp(1 - (z - Z0) / (Z1 - Z0), 0, 1);
+    ctx.strokeStyle = `rgba(225,238,255,${0.35 + 0.5 * fade})`; ctx.beginPath();
+    for (let i = 0; i <= NX; i++) { const x = -X + i * 2 * X / NX, q = P(x * z / 2.2, z); i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y); }
+    ctx.stroke();
+  }
+  for (let i = 0; i <= NX; i++) {                                 // columns
+    ctx.strokeStyle = 'rgba(225,238,255,0.45)'; ctx.beginPath();
+    for (let j = 0; j <= NZ; j++) { const z = Z0 + j * (Z1 - Z0) / NZ - scroll, x = (-X + i * 2 * X / NX) * z / 2.2, q = P(x, z); j ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y); }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+// blue glow with rays of light
+function drawAura(t, a, center) {
+  ctx.save(); ctx.globalAlpha = a;
+  drawMirrored(video, 'blur(16px) brightness(0.95) saturate(0.4)');
+  ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = '#5f8ad8'; ctx.fillRect(0, 0, W, H);
+  ctx.globalCompositeOperation = 'screen'; ctx.fillStyle = 'rgba(40,80,170,0.35)'; ctx.fillRect(0, 0, W, H);
+  const cx = center ? center.x : W / 2, cy = center ? center.y : H * 0.4, R = Math.max(W, H);
+  ctx.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < 14; i++) {
+    const ang = i / 14 * Math.PI * 2 + t * 0.08 + Math.sin(t * 0.5 + i) * 0.05, wdt = 0.05 + 0.04 * Math.sin(i * 3.7 + t);
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 0.7); g.addColorStop(0, 'rgba(210,228,255,0.22)'); g.addColorStop(1, 'rgba(180,205,255,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, R, ang - wdt, ang + wdt); ctx.closePath(); ctx.fill();
+  }
+  const core = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.min(W, H) * 0.5); core.addColorStop(0, 'rgba(215,232,255,0.35)'); core.addColorStop(1, 'rgba(235,245,255,0)');
+  ctx.fillStyle = core; ctx.fillRect(0, 0, W, H);
+  ctx.restore();
+}
+
+/* ---------- 🐦 Birds: they circle the open palm ---------- */
+const birds = Array.from({ length: 22 }, () => ({ x: rand(0, 1) * innerWidth, y: rand(0.1, 0.6) * innerHeight, vx: rand(-2, 2), vy: rand(-1, 1), ph: rand(0, 6.28), s: rand(0.7, 1.3), orbit: rand(0.8, 1.6) * (Math.random() < 0.5 ? -1 : 1) }));
+function updateBirds(dt, targets) {
+  const f = dt * 60;
+  for (const b of birds) {
+    let tx = b.vx, ty = b.vy;
+    if (targets.length) {
+      // pick the nearest palm, fly towards a ring around it and swirl
+      let best = targets[0]; for (const p of targets) if (dist(p, b) < dist(best, b)) best = p;
+      const dx = best.x - b.x, dy = best.y - b.y, d = Math.hypot(dx, dy) || 1, ring = best.r * b.orbit * Math.sign(b.orbit);
+      const pull = (d - Math.abs(ring)) / d;                        // >0: come closer, <0: back off to the ring
+      const sp = 5.5 * (1 + beat * 0.5);
+      tx = (dx * pull) / d * sp + (-dy / d) * sp * 0.8 * Math.sign(b.orbit);
+      ty = (dy * pull) / d * sp + (dx / d) * sp * 0.8 * Math.sign(b.orbit);
+      b.vx += (tx - b.vx) * 0.08 * f; b.vy += (ty - b.vy) * 0.08 * f;
+    } else {
+      b.vx += (Math.cos(b.ph * 0.05) * 2.2 - b.vx) * 0.02 * f; b.vy += (Math.sin(b.ph * 0.031) * 0.8 - b.vy) * 0.02 * f;
+    }
+    for (const o of birds) { if (o === b) continue; const dx = b.x - o.x, dy = b.y - o.y, d2 = dx * dx + dy * dy; if (d2 < 700) { b.vx += dx / (d2 + 1) * 3; b.vy += dy / (d2 + 1) * 3; } }
+    b.x += b.vx * f; b.y += b.vy * f; b.ph += (0.25 + beat * 0.3) * f;
+    const m = 80; if (b.x < -m) b.x = W + m; if (b.x > W + m) b.x = -m; if (b.y < -m) b.y = H + m; if (b.y > H + m) b.y = -m;
   }
 }
-function drawBirds() {
-  ctx.save(); ctx.strokeStyle = 'rgba(28,45,80,0.85)'; ctx.lineCap = 'round';
+function drawBirds(a) {
+  if (a < 0.02) return;
+  ctx.save(); ctx.globalAlpha = a; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   for (const b of birds) {
-    const s = 9 * b.s * Math.min(1.6, W / 900), f = Math.sin(b.ph) * 0.6;
-    ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(Math.atan2(b.vy, b.vx) * 0.25);
-    ctx.lineWidth = 1.6 * b.s;
+    const s = 13 * b.s * Math.min(1.6, W / 900), f = Math.sin(b.ph) * 0.7, dir = Math.atan2(b.vy, b.vx);
+    ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(dir * 0.3);
+    // a little seagull: two curved wings and a body
     ctx.beginPath();
-    ctx.moveTo(-s, -s * f); ctx.quadraticCurveTo(-s * 0.45, -s * (0.55 + f * 0.4), 0, 0);
-    ctx.quadraticCurveTo(s * 0.45, -s * (0.55 + f * 0.4), s, -s * f);
-    ctx.stroke(); ctx.restore();
+    ctx.moveTo(-s, -s * f * 0.9); ctx.quadraticCurveTo(-s * 0.5, -s * (0.45 + f * 0.5), 0, 0);
+    ctx.quadraticCurveTo(s * 0.5, -s * (0.45 + f * 0.5), s, -s * f * 0.9);
+    ctx.quadraticCurveTo(s * 0.45, -s * (0.2 + f * 0.3), 0, s * 0.12); ctx.quadraticCurveTo(-s * 0.45, -s * (0.2 + f * 0.3), -s, -s * f * 0.9);
+    ctx.fillStyle = 'rgba(250,252,255,0.95)'; ctx.fill(); ctx.strokeStyle = 'rgba(70,95,140,0.7)'; ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle = 'rgba(60,80,120,0.8)'; ctx.beginPath(); ctx.ellipse(0, s * 0.05, s * 0.09, s * 0.16, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
   }
   ctx.restore();
 }
@@ -221,7 +267,6 @@ function drawWing(sh, side, sw, t) {
   const amt = wingAmt; if (amt < 0.01) return;
   const flap = Math.sin(t * 2.2) * 0.08 + beat * 0.15;
   ctx.save(); ctx.translate(sh.x, sh.y); ctx.scale(side, 1);
-  // two rows of feathers: long flight feathers behind, short coverts in front
   const rows = [{ n: 8, len: 1.45, w: 0.16, a0: -0.25, step: 0.17, col: [118, 160, 230], alpha: 0.42 },
                 { n: 6, len: 0.85, w: 0.14, a0: -0.45, step: 0.2, col: [165, 198, 245], alpha: 0.5 }];
   for (const R of rows) {
@@ -234,13 +279,11 @@ function drawWing(sh, side, sw, t) {
       gr.addColorStop(0, `rgba(${r},${g},${b},${R.alpha * amt})`);
       gr.addColorStop(0.7, `rgba(${r + 30},${g + 25},${b + 10},${R.alpha * 0.8 * amt})`);
       gr.addColorStop(1, `rgba(225,238,255,${0.15 * amt})`);
-      // feather: rounded base, pointed tip
       ctx.beginPath(); ctx.moveTo(0, 0);
       ctx.bezierCurveTo(len * 0.3, -wd, len * 0.8, -wd * 0.9, len, 0);
       ctx.bezierCurveTo(len * 0.8, wd * 0.6, len * 0.3, wd * 0.7, 0, 0);
       ctx.fillStyle = gr; ctx.shadowColor = 'rgba(150,190,255,0.6)'; ctx.shadowBlur = 10; ctx.fill();
       ctx.shadowBlur = 0; ctx.strokeStyle = `rgba(240,247,255,${0.55 * amt})`; ctx.lineWidth = 1; ctx.stroke();
-      // shaft
       ctx.beginPath(); ctx.moveTo(len * 0.05, 0); ctx.lineTo(len * 0.92, -wd * 0.05);
       ctx.strokeStyle = `rgba(245,250,255,${0.35 * amt})`; ctx.stroke();
       ctx.restore();
@@ -251,103 +294,72 @@ function drawWing(sh, side, sw, t) {
 
 /* ---------- Sparkles ---------- */
 const sparks = [];
-function spark(x, y, n, spread) {
-  for (let i = 0; i < n && sparks.length < 300; i++) sparks.push({ x: x + rand(-spread, spread), y: y + rand(-spread, spread), vx: rand(-0.6, 0.6), vy: rand(-1.4, -0.2), r: rand(1, 3), life: 1 });
-}
+function spark(x, y, n, spread) { for (let i = 0; i < n && sparks.length < 300; i++) sparks.push({ x: x + rand(-spread, spread), y: y + rand(-spread, spread), vx: rand(-0.6, 0.6), vy: rand(-1.4, -0.2), r: rand(1, 3), life: 1 }); }
 function drawSparks() {
   ctx.save(); ctx.globalCompositeOperation = 'lighter';
-  for (const p of sparks) { p.x += p.vx; p.y += p.vy; p.life -= 0.02;
-    ctx.globalAlpha = Math.max(0, p.life); ctx.fillStyle = '#eaf4ff'; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill(); }
+  for (const p of sparks) { p.x += p.vx; p.y += p.vy; p.life -= 0.02; ctx.globalAlpha = Math.max(0, p.life); ctx.fillStyle = '#eaf4ff'; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill(); }
   ctx.restore();
   for (let i = sparks.length - 1; i >= 0; i--) if (sparks[i].life <= 0) sparks.splice(i, 1);
 }
-function onBeat() {
-  if (palm) spark(palm.c.x, palm.c.y, 10, 40);
-  for (let i = 0; i < 3; i++) { const L = layers[(Math.random() * BASE_LAYERS) | 0]; spark(rand(0, W), ridgeY(L, rand(0, W), 0), 4, 20); }
-}
+function onBeat() { for (const h of hands) if (h.open) spark(h.c.x, h.c.y, 8, 30); }
 
-/* ---------- Hand analysis ---------- */
-let palm = null;            // the open palm we are tracking this frame
-let rollVel = 0, palmHist = [], prevRoll = null, extraLayers = 0, lastPalmAt = 0, ridgeAmt = 0, ridgePts = null;
+/* ---------- Hands ---------- */
 let statusMsg = '', statusAt = 0;
 function say(msg) { if (msg !== statusMsg || performance.now() - statusAt > 1200) { statusMsg = msg; statusAt = performance.now(); $('statusText').textContent = msg; } }
 function analyzeHand(lms, wl) {
   const p = lms.map(toScreen);
   const w = wl && wl.length === 21 ? wl : null;
   const d3 = (a, b) => w ? Math.hypot(w[a].x - w[b].x, w[a].y - w[b].y, w[a].z - w[b].z) : dist(p[a], p[b]);
-  const hs3 = d3(0, 9) || 1, r = (t, q) => d3(t, 0) / (d3(q, 0) || 1);
-  const ext = [r(8, 6), r(12, 10), r(16, 14), r(20, 18)].map(v => v > 1.12);
-  const open = ext.filter(Boolean).length >= 4;
-  const spread = (d3(4, 8) + d3(8, 12) + d3(12, 16) + d3(16, 20)) / 4 / hs3;   // how far apart the fingers are
+  const r = (t, q) => d3(t, 0) / (d3(q, 0) || 1);
+  const rr = [r(8, 6), r(12, 10), r(16, 14), r(20, 18)], ext = rr.map(v => v > 1.12);
+  const n = ext.filter(Boolean).length, open = n >= 4;
+  const point = ext[0] && !ext[1] && !ext[2] && !ext[3];
+  const fist = rr.every(v => v < 1.0);
   const c = { x: (p[0].x + p[5].x + p[9].x + p[13].x + p[17].x) / 5, y: (p[0].y + p[5].y + p[9].y + p[13].y + p[17].y) / 5 };
-  const roll = Math.atan2(p[9].y - p[0].y, p[9].x - p[0].x);
-  return { p, open, spread, c, roll, size: dist(p[0], p[9]) };
+  const dx = p[9].x - p[0].x, dy = p[9].y - p[0].y;
+  const up = open && dy < -Math.abs(dx) * 0.9;                   // fingers pointing up
+  const flat = open && Math.abs(dy) < Math.abs(dx) * 0.85;        // fingers pointing sideways: a flat hand
+  return { p, open, point, fist, up, flat, c, size: dist(p[0], p[9]) };
 }
-function updateFromHands(hands, now, dt) {
-  palm = hands.find(h => h.open) || null;
-  const anyHand = hands[0] || null;
-  // 👋 wave: hand speed decides where the birds go
-  if (anyHand) {
-    palmHist.push({ t: now, x: anyHand.c.x, y: anyHand.c.y });
-    while (palmHist.length && now - palmHist[0].t > 220) palmHist.shift();
-    if (palmHist.length > 3) {
-      const a = palmHist[0], b = palmHist[palmHist.length - 1], dtt = (b.t - a.t) / 1000 || 1;
-      const vx = (b.x - a.x) / dtt, vy = (b.y - a.y) / dtt, v = Math.hypot(vx, vy);
-      if (v > Math.min(W, H) * 1.1) {                      // a clear, fast wave
-        let target = Math.atan2(vy, vx), diff = Math.atan2(Math.sin(target - flockDir), Math.cos(target - flockDir));
-        flockDir += diff * 0.25; flockSpeed = lerp(flockSpeed, 1.8, 0.2);
-        say(vx > 0 ? '👋 Birds fly right →' : '👋 ← Birds fly left');
-      }
-    }
-    // 🔄 wrist turn: rotate the flock with the hand
-    if (prevRoll !== null && dt > 0) {
-      const dr = Math.atan2(Math.sin(anyHand.roll - prevRoll), Math.cos(anyHand.roll - prevRoll));
-      rollVel = lerp(rollVel, dr / dt, 0.35);                     // smoothed angular speed (rad/s)
-      if (anyHand.open && Math.abs(rollVel) > 1.4 && Math.abs(dr) < 0.6) { flockDir += dr * 1.2; say('🔄 The flock turns with your wrist'); }
-    }
-    prevRoll = anyHand.roll;
-  } else { prevRoll = null; palmHist = []; }
-  flockSpeed = lerp(flockSpeed, 1, 0.01);
 
-  // 🖐 open palm: ridge from the palm line; ✋ spread fingers: extra mountain layers far away
-  if (palm) {
-    lastPalmAt = now;
-    const target = clamp(Math.round((palm.spread - 0.42) / 0.055), 0, MAX_LAYERS - BASE_LAYERS); // spread ≈0.42 relaxed … ≈0.64 wide (measured)
-    extraLayers = lerp(extraLayers, target, 1 - Math.exp(-dt * 4));
-    ridgeAmt = lerp(ridgeAmt, 1, 0.12);
-    // palm line: thumb base → index → middle → ring → pinky knuckles, extended to both screen edges
-    const k = [1, 5, 9, 13, 17].map(i => palm.p[i]).sort((a, b) => a.x - b.x);
-    ridgePts = k;
-    say(target > 0 ? `✋ ${BASE_LAYERS + Math.round(extraLayers)} layers of mountains` : '🖐 Mountains grow from your palm');
-    if (Math.random() < 0.15) spark(palm.c.x, palm.c.y - palm.size * 0.3, 1, palm.size * 0.6);
-  } else {
-    ridgeAmt = lerp(ridgeAmt, 0, 0.06);
-    if (now - lastPalmAt > 1500) extraLayers = lerp(extraLayers, 0, 0.02);
+/* ---------- Gesture → scenes ---------- */
+let lastTip = null, lastDropAt = 0, holdFlat = 0, holdUp = 0, holdFist = 0, holdVanish = 0;
+const vanish = { t0: -1e9 };
+function updateGestures(hands, now, dt) {
+  const vanishing = now - vanish.t0 < 4600;
+  // ☝️ a drop of water wherever you point (a new one when the finger moves on, or every ~0.9 s)
+  const pt = hands.find(h => h.point);
+  if (pt) {
+    const tip = pt.p[8];
+    if (!lastTip || now - lastDropAt > 900 || dist(tip, lastTip) > pt.size * 0.9) { addRipple(tip.x, tip.y, 1); lastDropAt = now; lastTip = { x: tip.x, y: tip.y }; say('💧 Ripples'); }
+  } else lastTip = null;
+  const ups = hands.filter(h => h.up), flats = hands.filter(h => h.flat), fists = hands.filter(h => h.fist);
+  // 🙌 both hands raised beside your head → vanish (checked first)
+  const headY = faceBox ? faceBox.chin.y : H * 0.45;
+  const handsHigh = ups.length === 2 && ups.every(h => h.p[0].y < headY + (faceBox ? faceBox.h * 0.2 : 0)) && dist(ups[0].c, ups[1].c) > (faceBox ? faceBox.w * 1.8 : W * 0.25);
+  holdVanish = handsHigh ? holdVanish + dt : 0;
+  if (holdVanish > 0.5 && !vanishing && now - vanish.t0 > 6000 && haveMask) { vanish.t0 = now; say('🫥 Vanishing…'); }
+  // 🤲 flat hands → wireframe mountains, peaks under your hands
+  holdFlat = flats.length ? holdFlat + dt : 0;
+  if (holdFlat > 0.25) {
+    sceneUntil.wire = now + 2500; say('🏔 Lift your hands to raise the mountains');
+    wireBumps = flats.map(h => {
+      const z = 3.2;   // screen x → world x at depth z
+      return { x: (h.c.x - W / 2) / (Math.min(W, H) * 0.9) * z, z, h: clamp((H * 0.95 - h.c.y) / H, 0, 1) * 2.4 };
+    });
   }
-  const want = BASE_LAYERS + extraLayers;
-  for (const L of layers) L.alpha = lerp(L.alpha, L.d < Math.round(want) ? 1 : 0, 1 - Math.exp(-dt * 2.5));
-}
-function drawPalmRidge(t) {
-  if (ridgeAmt < 0.02 || !ridgePts) return;
-  const k = ridgePts, hsz = palm ? palm.size : dist(k[0], k[k.length - 1]);
-  // build a ridge: left edge → palm knuckles (with little peaks) → right edge
-  const pts = [];
-  const yL = k[0].y, yR = k[k.length - 1].y;
-  for (let x = 0; x < k[0].x; x += 14) pts.push({ x, y: lerp(yL, yL, 0) - Math.abs(Math.sin(x * 0.03 + t)) * hsz * 0.25 * (x / k[0].x) });
-  for (let i = 0; i < k.length; i++) {
-    pts.push({ x: k[i].x, y: k[i].y });
-    if (i < k.length - 1) { const m = { x: (k[i].x + k[i + 1].x) / 2, y: (k[i].y + k[i + 1].y) / 2 - hsz * (0.35 + 0.15 * Math.sin(i * 2.1 + t)) }; pts.push(m); }
+  // 🖐 open palm raised (not the vanish pose) → blue sky and birds
+  holdUp = ups.length && !handsHigh ? holdUp + dt : (ups.length ? holdUp : 0);
+  if (holdUp > 0.2 && !vanishing) { sceneUntil.sky = now + 3500; if (!handsHigh) say('🐦 The birds follow your hand'); }
+  // ✊✊ two fists → blue glow
+  holdFist = fists.length === 2 ? holdFist + dt : 0;
+  if (holdFist > 0.3) { sceneUntil.aura = now + 2500; say('✨ Glow'); }
+  // fade scenes; only the newest one stays fully on
+  const order = Object.keys(scene).sort((a, b) => sceneUntil[b] - sceneUntil[a]);
+  for (const k of Object.keys(scene)) {
+    const on = !vanishing && now < sceneUntil[k] && k === order[0];
+    scene[k] = lerp(scene[k], on ? 1 : 0, ease(dt, on ? 3 : 1.6));
   }
-  for (let x = k[k.length - 1].x + 14; x <= W; x += 14) pts.push({ x, y: yR - Math.abs(Math.sin(x * 0.03 + t * 0.8)) * hsz * 0.25 * (1 - (x - k[k.length - 1].x) / (W - k[k.length - 1].x + 1)) });
-  ctx.save(); ctx.globalAlpha = ridgeAmt;
-  ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y); for (const q of pts) ctx.lineTo(q.x, q.y);
-  ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.closePath();
-  const g = ctx.createLinearGradient(0, Math.min(yL, yR) - hsz, 0, Math.max(yL, yR) + hsz * 1.5);
-  g.addColorStop(0, 'rgba(120,175,235,0.32)'); g.addColorStop(1, 'rgba(120,175,235,0)');
-  ctx.fillStyle = g; ctx.fill();
-  ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y); for (const q of pts) ctx.lineTo(q.x, q.y);
-  ctx.strokeStyle = `rgba(235,246,255,${0.8 + beat * 0.2})`; ctx.lineWidth = 2.2 + beat * 2; ctx.shadowColor = '#bfe0ff'; ctx.shadowBlur = 14 + beat * 16; ctx.lineJoin = 'round';
-  ctx.stroke(); ctx.restore();
 }
 
 /* ---------- MediaPipe ---------- */
@@ -356,13 +368,14 @@ let hands = [], shoulders = null, faceBox = null, frameN = 0, lastVT = -1;
 const poseIn = document.createElement('canvas'), pix = poseIn.getContext('2d', { willReadFrequently: true });
 const maskC = document.createElement('canvas'), mcx = maskC.getContext('2d');
 const personC = document.createElement('canvas'), pcx = personC.getContext('2d');
-let haveMask = false, maskImg = null;
+const plateC = document.createElement('canvas'), plx = plateC.getContext('2d');   // your room without you (built up while you move)
+const tmpC = document.createElement('canvas'), tcx = tmpC.getContext('2d');
+let haveMask = false, maskImg = null, plateReady = 0;
 
 async function loadModels() {
   fileset = await FilesetResolver.forVisionTasks(WASM);
   const hOpts = d => ({ baseOptions: { modelAssetPath: HAND_MODEL, delegate: d }, runningMode: 'VIDEO', numHands: 2 });
   try { handLM = await HandLandmarker.createFromOptions(fileset, hOpts('GPU')); } catch (e) { handLM = await HandLandmarker.createFromOptions(fileset, hOpts('CPU')); }
-  // face + pose run on CPU (separate from the hand model on GPU) so they don't interfere
   faceLM = await FaceLandmarker.createFromOptions(fileset, { baseOptions: { modelAssetPath: FACE_MODEL, delegate: 'CPU' }, runningMode: 'VIDEO', numFaces: 1, outputFaceBlendshapes: true });
   try {
     poseLM = await PoseLandmarker.createFromOptions(fileset, { baseOptions: { modelAssetPath: POSE_MODEL, delegate: 'CPU' }, runningMode: 'VIDEO', numPoses: 1, outputSegmentationMasks: true });
@@ -379,15 +392,12 @@ function detect(now) {
   } catch (e) { }
   if (poseLM && frameN % 2 === 0) {
     const pw = 320, ph = Math.round(320 * vh / vw);
-    if (poseIn.width !== pw || poseIn.height !== ph) { poseIn.width = pw; poseIn.height = ph; maskC.width = pw; maskC.height = ph; }
+    if (poseIn.width !== pw || poseIn.height !== ph) { poseIn.width = pw; poseIn.height = ph; }
     pix.drawImage(video, 0, 0, pw, ph);
     try {
       const r = poseLM.detectForVideo(poseIn, now);
       const lm = r.landmarks && r.landmarks[0];
-      if (lm && lm[11].visibility > 0.4 && lm[12].visibility > 0.4) {
-        const a = toScreen(lm[11]), b = toScreen(lm[12]);
-        shoulders = { a, b, w: dist(a, b) };
-      }
+      if (lm && lm[11].visibility > 0.4 && lm[12].visibility > 0.4) { const a = toScreen(lm[11]), b = toScreen(lm[12]); shoulders = { a, b, w: dist(a, b) }; }
       const m = r.segmentationMasks && r.segmentationMasks[0];
       if (m) {
         const arr = m.getAsFloat32Array();
@@ -397,6 +407,7 @@ function detect(now) {
         if (maskC.width !== m.width) { maskC.width = m.width; maskC.height = m.height; }
         mcx.putImageData(maskImg, 0, 0); haveMask = true;
         m.close();
+        updatePlate();
       }
     } catch (e) { console.warn(e); }
   }
@@ -413,59 +424,99 @@ function detect(now) {
         if (!closed && eyesClosed) eyesOpenSince = now;
         eyesClosed = closed;
         const top = toScreen(lm[10]), chin = toScreen(lm[152]), l = toScreen(lm[234]), rr = toScreen(lm[454]);
-        faceBox = { top, chin, w: dist(l, rr), h: dist(top, chin) };
+        faceBox = { top, chin, w: dist(l, rr), h: dist(top, chin), c: { x: (top.x + chin.x) / 2, y: (top.y + chin.y) / 2 } };
       } else { eyesClosed = false; }
     } catch (e) { }
   }
 }
+// keep a picture of the room without you: copy only the pixels where you are not
+function updatePlate() {
+  const pw = 480, ph = Math.round(480 * vh / vw);
+  if (plateC.width !== pw || plateC.height !== ph) { plateC.width = pw; plateC.height = ph; tmpC.width = pw; tmpC.height = ph; plateReady = 0; }
+  if (plateReady === 0) { plx.filter = 'blur(18px)'; plx.drawImage(video, 0, 0, pw, ph); plx.filter = 'none'; }   // first guess: a blurred room
+  tcx.globalCompositeOperation = 'source-over'; tcx.clearRect(0, 0, pw, ph); tcx.drawImage(video, 0, 0, pw, ph);
+  tcx.globalCompositeOperation = 'destination-out'; tcx.filter = 'blur(6px)'; tcx.drawImage(maskC, -8, -8, pw + 16, ph + 16); tcx.drawImage(maskC, 0, 0, pw, ph); tcx.filter = 'none';
+  plx.globalAlpha = plateReady < 5 ? 1 : 0.35; plx.drawImage(tmpC, 0, 0); plx.globalAlpha = 1;
+  plateReady++;
+}
+function cutoutPerson() {
+  const pw = 640, ph = Math.round(640 * vh / vw);
+  if (personC.width !== pw || personC.height !== ph) { personC.width = pw; personC.height = ph; }
+  pcx.globalCompositeOperation = 'source-over'; pcx.clearRect(0, 0, pw, ph);
+  pcx.drawImage(video, 0, 0, pw, ph);
+  pcx.globalCompositeOperation = 'destination-in'; pcx.filter = 'blur(2px)'; pcx.drawImage(maskC, 0, 0, pw, ph); pcx.filter = 'none';
+  return personC;
+}
+function silhouette(col) {
+  const pw = 640, ph = Math.round(640 * vh / vw);
+  const s = silC; if (s.width !== pw || s.height !== ph) { s.width = pw; s.height = ph; }
+  const g = s.getContext('2d'); g.globalCompositeOperation = 'source-over'; g.clearRect(0, 0, pw, ph);
+  g.filter = 'blur(1.5px)'; g.drawImage(maskC, 0, 0, pw, ph); g.filter = 'none';
+  g.globalCompositeOperation = 'source-in'; g.fillStyle = col; g.fillRect(0, 0, pw, ph);
+  return s;
+}
+const silC = document.createElement('canvas');
 
 /* ---------- Main loop ---------- */
 let lastT = performance.now(), running = false;
 function frame() {
   requestAnimationFrame(frame);
   const now = performance.now(), dt = Math.min(0.1, (now - lastT) / 1000), t = now / 1000; lastT = now;
-  detect(now);
-  updateBeat(now);
-  updateFromHands(hands, now, dt);
-  // 😌 eyes closed for 0.3 s → wings; eyes open for 1.2 s → wings fade
+  detect(now); updateBeat(now); updateGestures(hands, now, dt);
   let wantWings = eyesClosed ? (now - eyesClosedSince > 200) : (now - eyesOpenSince < 1500 && wingAmt > 0.25);
-  if (window.__forceWings) wantWings = true; // test hook
-  wingAmt = lerp(wingAmt, wantWings ? 1 : 0, 1 - Math.exp(-dt * (wantWings ? 4 : 1.5))); // time-based so slow frame rates still work
+  if (window.__forceWings) wantWings = true;
+  wingAmt = lerp(wingAmt, wantWings ? 1 : 0, ease(dt, wantWings ? 4 : 1.5));
   if (wingAmt > 0.3) say('😌 Misty blue wings');
-  if (!hands.length && !eyesClosed && now - statusAt > 2500) say(haveMask ? '☁️ Try waving, opening your palm or closing your eyes' : '☁️ Looking for you…');
-  updateBirds(dt);
+  if (!hands.length && !eyesClosed && now - statusAt > 2500) say(haveMask ? '☁️ Point · raise a palm · flat hands · two fists · hands up' : '☁️ Looking for you…');
+  const palms = hands.filter(h => h.open).map(h => ({ x: h.c.x, y: h.c.y - h.size * 0.6, r: h.size * 1.4 }));
+  updateBirds(dt, scene.sky > 0.2 ? palms : []);
   $('beatDot').style.transform = `scale(${1 + beat * 1.2})`; $('beatDot').style.background = analyser ? `rgba(160,210,255,${0.5 + beat * 0.5})` : 'rgba(255,255,255,.35)';
 
-  // 1) dream background
-  drawSky(t); drawMountains(t); drawBirds();
-  // 2) wings behind you
+  ctx.fillStyle = '#0d1830'; ctx.fillRect(0, 0, W, H);
+  if (video.readyState < 2) return;
+  // 1) your room, softly graded
+  drawMirrored(video, 'saturate(1.05) brightness(1.05)');
+  ctx.save(); ctx.globalCompositeOperation = 'soft-light'; ctx.globalAlpha = 0.25; ctx.fillStyle = '#b9d4f2'; ctx.fillRect(0, 0, W, H); ctx.restore();
+  // 2) scenes behind you
+  if (scene.aura > 0.01) drawAura(t, scene.aura, faceBox ? faceBox.c : null);
+  if (scene.wire > 0.01) drawWire(t, scene.wire);
+  if (scene.sky > 0.01) drawSky(t, scene.sky);
+  // 3) wings behind you
   let sh = shoulders;
-  if (!sh && faceBox) { const cx = (faceBox.top.x + faceBox.chin.x) / 2, y = faceBox.chin.y + faceBox.h * 0.55; sh = { a: { x: cx - faceBox.w * 0.9, y }, b: { x: cx + faceBox.w * 0.9, y }, w: faceBox.w * 1.8 }; }
+  if (!sh && faceBox) { const cx = faceBox.c.x, y = faceBox.chin.y + faceBox.h * 0.55; sh = { a: { x: cx - faceBox.w * 0.9, y }, b: { x: cx + faceBox.w * 0.9, y }, w: faceBox.w * 1.8 }; }
   if (sh && wingAmt > 0.01) {
     const [L, R] = sh.a.x < sh.b.x ? [sh.a, sh.b] : [sh.b, sh.a];
     drawWing({ x: L.x + sh.w * 0.12, y: L.y - sh.w * 0.05 }, -1, sh.w, t);
     drawWing({ x: R.x - sh.w * 0.12, y: R.y - sh.w * 0.05 }, 1, sh.w, t);
     if (Math.random() < 0.3) spark(rand(L.x - sh.w, R.x + sh.w), rand(L.y - sh.w, L.y), 1, 10);
   }
-  // 3) you, cut out from your room
-  if (video.readyState >= 2) {
-    const c = cover();
-    if (haveMask) {
-      const pw = 640, ph = Math.round(640 * vh / vw);
-      if (personC.width !== pw || personC.height !== ph) { personC.width = pw; personC.height = ph; }
-      pcx.globalCompositeOperation = 'source-over'; pcx.clearRect(0, 0, pw, ph);
-      pcx.drawImage(video, 0, 0, pw, ph);
-      pcx.globalCompositeOperation = 'destination-in'; pcx.filter = 'blur(2px)';
-      pcx.drawImage(maskC, 0, 0, pw, ph); pcx.filter = 'none';
-      ctx.save(); ctx.translate(W, 0); ctx.scale(-1, 1); ctx.drawImage(personC, c.ox, c.oy, c.dw, c.dh); ctx.restore();
-      // soft dreamy tint on you
-      ctx.save(); ctx.globalCompositeOperation = 'soft-light'; ctx.globalAlpha = 0.25; ctx.fillStyle = '#a9cdf5'; ctx.fillRect(0, 0, W, H); ctx.restore();
-    } else {
-      ctx.save(); ctx.globalAlpha = 0.9; ctx.translate(W, 0); ctx.scale(-1, 1); ctx.drawImage(video, c.ox, c.oy, c.dw, c.dh); ctx.restore();
-    }
+  // 4) you, in front of the scene
+  const sceneMax = Math.max(scene.sky, scene.wire, scene.aura);
+  if (haveMask && (sceneMax > 0.01 || wingAmt > 0.01)) {
+    const p = cutoutPerson();
+    ctx.save();
+    if (scene.aura > 0.01) { ctx.shadowColor = `rgba(200,225,255,${0.9 * scene.aura})`; ctx.shadowBlur = 40 * scene.aura; ctx.filter = `brightness(${1 + 0.15 * scene.aura})`; }
+    drawMirrored(p); ctx.restore();
   }
-  // 4) in front: palm ridge and sparkles
-  drawPalmRidge(t); drawSparks();
+  // 5) 🫥 vanish: white silhouette → gone (only the room is left) → back
+  const va = (now - vanish.t0) / 1000;
+  if (va >= 0 && va < 4.6 && haveMask) {
+    const plateA = va < 0.8 ? 0 : va < 1.6 ? (va - 0.8) / 0.8 : va < 3.6 ? 1 : 1 - (va - 3.6) / 1.0;
+    const silA = va < 0.5 ? va / 0.5 : va < 1.3 ? 1 : va < 2.1 ? 1 - (va - 1.3) / 0.8 : 0;
+    if (plateA > 0) {
+      ctx.save(); ctx.globalAlpha = clamp(plateA, 0, 1); drawMirrored(plateC, 'saturate(1.05) brightness(1.05)'); ctx.restore();
+      ctx.save(); ctx.globalCompositeOperation = 'soft-light'; ctx.globalAlpha = 0.25 * clamp(plateA, 0, 1); ctx.fillStyle = '#b9d4f2'; ctx.fillRect(0, 0, W, H); ctx.restore();
+    }
+    if (silA > 0) {
+      // the room fades to a cool blue-grey and you turn into a white cut-out
+      ctx.save(); ctx.globalAlpha = 0.55 * clamp(silA, 0, 1); ctx.fillStyle = '#7f9cc4'; ctx.globalCompositeOperation = 'multiply'; ctx.fillRect(0, 0, W, H); ctx.restore();
+      ctx.save(); ctx.globalAlpha = clamp(silA, 0, 1); ctx.shadowColor = 'rgba(255,255,255,0.8)'; ctx.shadowBlur = 18; drawMirrored(silhouette('#f6f8fb')); ctx.restore();
+    }
+    if (va > 3.6 && va < 3.8) spark(faceBox ? faceBox.c.x : W / 2, faceBox ? faceBox.c.y : H / 2, 20, 120);
+  }
+  // 6) in front: birds, sparkles, then the water drops bend everything
+  drawBirds(scene.sky); drawSparks();
+  drawRipples(now);
 }
 
 /* ---------- Recording ---------- */
@@ -497,7 +548,7 @@ $('startBtn').onclick = async () => {
     $('start').style.display = 'none'; say('Loading models…');
     if (!running) { running = true; requestAnimationFrame(frame); }
     await loadModels();
-    say('☁️ Try waving, opening your palm or closing your eyes');
+    say('☁️ Point · raise a palm · flat hands · two fists · hands up');
   } catch (e) {
     console.error(e); $('start').style.display = 'flex'; btn.disabled = false; btn.textContent = 'Try again';
     $('err').textContent = 'Could not open the camera or load the models. Please allow camera access, check your internet connection, and use Chrome or Safari. (' + (e.message || e) + ')';
@@ -505,7 +556,10 @@ $('startBtn').onclick = async () => {
 };
 
 // for automated tests
-window.__ds = () => ({ hands: hands.length, palm: !!palm, spread: palm ? +palm.spread.toFixed(2) : null, extra: +extraLayers.toFixed(2), eyesClosed, wing: +wingAmt.toFixed(2), mask: haveMask, shoulders: !!shoulders, flockDir: +flockDir.toFixed(2), status: statusMsg });
+window.__ds = () => ({ hands: hands.length, flags: hands.map(h => (h.point ? 'P' : '') + (h.up ? 'U' : '') + (h.flat ? 'F' : '') + (h.fist ? 'X' : '') + (h.open ? 'O' : '')).join(','), sky: +scene.sky.toFixed(2), wire: +scene.wire.toFixed(2), aura: +scene.aura.toFixed(2), vanish: performance.now() - vanish.t0 < 4600, ripples: ripples.length, mask: haveMask, wing: +wingAmt.toFixed(2), status: statusMsg });
+window.__scene = (k) => { sceneUntil[k] = performance.now() + 60000; };
+window.__vanish = () => { vanish.t0 = performance.now(); };
+window.__drop = (x, y) => addRipple(x * W, y * H, 1);
 </script>
 </body>
 </html>

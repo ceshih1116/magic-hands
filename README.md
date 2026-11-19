@@ -11,7 +11,7 @@ Built with [MediaPipe Tasks Vision](https://developers.google.com/mediapipe) and
 |---|---|
 | `magic-hands.html` | Webcam effects: open palm grows flowers, ✌️ collects them, 🫰 finger heart pops sticker hearts, 🫶 two-hand heart bursts hearts, 💌 words on fingertips, 🌫 breathe on the "window" and write in the fog |
 | `happy-birthday.html` | AR birthday in a refined, high-tech style (pastel light-leak grade, film grain, hand wireframe HUD). Open your palm and small line-art butterflies land on your fingertips; point one finger to blow bubbles (some hold photos) and poke them to pop; frame with both thumbs and index fingers (index fingers pointing opposite ways) and the space traced by your fingers opens onto a starry sky (galaxy, aurora, pink dusk); show two peace signs for a glitchy outline of your age (set on the start screen) and a three-tier pastel cake with gold candles; close your eyes for your wish written across a constellation; thumbs up for floating line-art hearts, an OK sign for a halo ring, a clap for a burst of glitter; tap your wrist for a holographic watch at 22:22; blow (rounded lips held 0.6 s) to dissolve the candle light. Photos are picked by the user and never leave the browser |
-| `dreamscape.html` | AR daydream: your room is replaced with sky and layered mountains (pose segmentation). Wave to steer a flock of birds, turn your wrist to turn them, open your palm to grow a mountain ridge from your palm lines and spread your fingers to add far-away layers, close your eyes to grow misty blue wings, and turn on music sync so everything pulses with the beat (microphone onset detection) |
+| `dreamscape.html` | AR daydream in your own room, after the 徐綠楊柳柳鵝 style videos. Point one finger or tap the screen for water drops whose rings refract the picture; raise an open palm for a blue sky with seagulls that circle your hand; hold your hands flat for a dark-blue wireframe mountain world whose peaks rise under your hands; raise two fists for a blue glow with light rays; lift both hands beside your head to turn into a white silhouette and vanish (a clean plate of the room is built from the segmentation mask); close your eyes for misty blue wings; music sync pulses everything with the beat |
 | `gesture-dance.html` | Load a gesture-dance tutorial video, dance along in front of the camera, and get Perfect / Good / Miss on every beat, a final grade, and an optional recording |
 
 ## How it works
@@ -30,7 +30,7 @@ Built with [MediaPipe Tasks Vision](https://developers.google.com/mediapipe) and
   | standing still | D |
   | unrelated motion | D |
 
-- **Dreamscape:** Hand Landmarker (GPU) for waves, wrist roll and finger spread; Pose Landmarker with segmentation masks (CPU) for background replacement and shoulder anchors; Face Landmarker blendshapes (`eyeBlinkLeft/Right`) for the wings; Web Audio bass-energy onsets for beat sync. Finger-spread and eye-closure thresholds were calibrated on a real recording.
+- **Dreamscape:** Hand Landmarker (GPU) with 3D finger-curl ratios for point / open / fist and the palm direction (fingers up vs. flat); Pose Landmarker segmentation masks (CPU) for cutting you out in front of each scene, the white silhouette and a background plate for vanishing; Face Landmarker blendshapes (`eyeBlinkLeft/Right`) for the wings and the face box for the vanish pose; canvas ring-band magnification for the water ripples; Web Audio bass-energy onsets for beat sync.
 
 ## Privacy
 
