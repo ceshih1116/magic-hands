@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gesture Dance · Dance Along</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #160d1a; color: #fff;
+    font-family: -apple-system, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif; }
+  canvas#stage { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
+  video { position: fixed; left: 0; top: 0; width: 2px; height: 2px; opacity: 0.01; pointer-events: none; z-index: -1; } /* iPhone Safari will not play a display:none video */
+
+  .pill { background: rgba(20,12,28,.55); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,.18); border-radius: 999px; }
+  #hud { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 5;
+    display: flex; gap: 18px; align-items: center; padding: 8px 20px; font-size: 15px; }
+  #hud b { font-size: 22px; }
+  #hud .sep { width: 1px; height: 20px; background: rgba(255,255,255,.25); }
+  #bar { position: fixed; left: 0; right: 0; bottom: 0; height: 5px; background: rgba(255,255,255,.12); z-index: 5; }
+  #barFill { height: 100%; width: 0; background: linear-gradient(90deg, #ff8ac2, #b98bff); }
+  #tools { position: fixed; top: 16px; right: 16px; z-index: 6; display: flex; gap: 8px; }
+  .btn { height: 38px; padding: 0 14px; color: #fff; font-size: 14px; cursor: pointer;
+    background: rgba(20,12,28,.55); border: 1px solid rgba(255,255,255,.2); border-radius: 999px; }
+  .btn:hover { background: rgba(255,255,255,.18); }
+  .btn.on { background: rgba(255,120,180,.5); }
+  .hidden { display: none !important; }
+
+  /* setup + results overlays */
+  .overlay { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; overflow-y: auto; padding: 16px 0;
+    background: radial-gradient(ellipse at center, #3d1c44 0%, #140a19 75%); }
+  .card { width: min(520px, 92vw); max-height: calc(100vh - 32px); overflow-y: auto; padding: 28px 28px 24px; border-radius: 22px; background: rgba(255,255,255,.06);
+    border: 1px solid rgba(255,255,255,.14); box-shadow: 0 20px 60px rgba(0,0,0,.4); }
+  .card h1 { font-size: 28px; letter-spacing: 1px; margin-bottom: 6px; }
+  .card .sub { opacity: .7; font-size: 14px; margin-bottom: 22px; line-height: 1.6; }
+  .row { margin-bottom: 16px; }
+  .row label.t { display: block; font-size: 13px; opacity: .75; margin-bottom: 7px; }
+  .seg { display: flex; gap: 6px; flex-wrap: wrap; }
+  .seg button { flex: 1; min-width: 90px; padding: 9px 8px; border-radius: 12px; cursor: pointer; font-size: 14px;
+    color: #fff; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.16); }
+  .seg button.on { background: rgba(255,138,194,.45); border-color: rgba(255,170,210,.8); }
+  .file { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px;
+    background: rgba(255,255,255,.08); border: 1px dashed rgba(255,255,255,.3); cursor: pointer; font-size: 14px; }
+  .file input { display: none; }
+  #fileName { opacity: .8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .go { width: 100%; margin-top: 8px; padding: 14px; border: none; border-radius: 999px; font-size: 17px; color: #fff; cursor: pointer;
+    background: linear-gradient(135deg, #ff8ac2, #b98bff); box-shadow: 0 8px 30px rgba(255,138,194,.4); }
+  .go:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
+  #err { color: #ffb3b3; font-size: 13px; margin-top: 10px; min-height: 18px; }
+  #preview { display: none; height: 160px; max-width: 100%; margin: 10px auto 0; border-radius: 12px; background: #000; object-fit: contain; }
+
+  #countdown { position: fixed; inset: 0; z-index: 15; display: flex; align-items: center; justify-content: center;
+    font-size: 160px; font-weight: 800; text-shadow: 0 0 40px rgba(255,120,180,.8); pointer-events: none; }
+
+  .grade { font-size: 96px; font-weight: 800; line-height: 1; margin: 6px 0 10px;
+    background: linear-gradient(135deg, #ffd1e6, #ff6fae, #b98bff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 16px 0 18px; text-align: center; }
+  .stats div { background: rgba(255,255,255,.07); border-radius: 14px; padding: 10px 6px; }
+  .stats b { display: block; font-size: 24px; }
+  .stats span { font-size: 12px; opacity: .7; }
+  .two { display: flex; gap: 10px; }
+  .two .go { margin-top: 0; }
+  .ghostbtn { background: rgba(255,255,255,.1) !important; box-shadow: none !important; }
+</style>
+</head>
+<body>
+<video id="ref" playsinline></video>
+<video id="cam" playsinline muted></video>
+<canvas id="stage"></canvas>
+
+<div id="hud" class="pill hidden">
+  <span>Score <b id="score">0</b></span><span class="sep"></span>
+  <span>Combo <b id="combo">0</b></span><span class="sep"></span>
+  <span id="simTxt">Match —</span>
+</div>
+<div id="tools" class="hidden">
+  <button class="btn on" id="ghostBtn" title="Show the target pose">👻 Target pose</button>
+  <button class="btn" id="recBtn" title="Record this run">⏺ Record</button>
+  <button class="btn" id="stopBtn">⏹ End</button>
+</div>
+<div id="bar" class="hidden"><div id="barFill"></div></div>
+<div id="countdown" class="hidden"></div>
+
+<!-- Setup screen -->
+<div id="setup" class="overlay">
+  <div class="card">
+    <h1>✿ Gesture Dance</h1>
+    <p class="sub">Pick a gesture-dance tutorial video. Your camera compares your moves with the teacher in real time and rates every beat Perfect / Good / Miss.</p>
+
+    <div class="row">
+      <label class="t">1. Tutorial video</label>
+      <label class="file">📁 <span id="fileName">Choose a video file (mp4 / mov)</span><input type="file" id="fileIn" accept="video/*"></label>
+      <video id="preview" muted playsinline></video>
+    </div>
+
+    <div class="row">
+      <label class="t">2. Where is the teacher in the video? (for split-screen duets, pick the teacher's half)</label>
+      <div class="seg" id="cropSeg">
+        <button data-v="bottom" class="on">Bottom half</button>
+        <button data-v="top">Top half</button>
+        <button data-v="full">Full frame</button>
+      </div>
+    </div>
+
+    <div class="row">
+      <label class="t">3. Speed (slow it down while learning)</label>
+      <div class="seg" id="speedSeg">
+        <button data-v="0.6">0.6×</button>
+        <button data-v="0.8">0.8×</button>
+        <button data-v="1" class="on">1×</button>
+      </div>
+    </div>
+
+    <button class="go" id="startBtn" disabled>Turn on camera &amp; dance 💃</button>
+    <div id="err"></div>
+  </div>
+</div>
+
+<!-- Results screen -->
+<div id="result" class="overlay hidden">
+  <div class="card" style="text-align:center">
+    <div style="opacity:.75">Your result</div>
+    <div class="grade" id="gradeTxt">A</div>
+    <div style="font-size:18px">Score <b id="finalScore">0</b> · Average match <b id="finalSim">0%</b></div>
+    <div class="stats">
+      <div><b id="nPerfect">0</b><span>Perfect</span></div>
+      <div><b id="nGood">0</b><span>Good</span></div>
+      <div><b id="nMiss">0</b><span>Miss</span></div>
+    </div>
+    <div class="two">
+      <button class="go" id="againBtn">Dance again</button>
+      <button class="go ghostbtn hidden" id="dlBtn">⬇ Download video</button>
+    </div>
+    <button class="go ghostbtn" id="backBtn" style="margin-top:10px">Choose another video</button>
+  </div>
+</div>
+
+<script type="module">
+import { FilesetResolver, PoseLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs";
+const WASM = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm";
+const POSE_MODEL = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
+
+const $ = id => document.getElementById(id);
+const stage = $('stage'), ctx = stage.getContext('2d');
+const refV = $('ref'), camV = $('cam');
+let W = 0, H = 0; const DPR = Math.min(window.devicePixelRatio || 1, 2);
+function resize() { W = innerWidth; H = innerHeight; stage.width = W * DPR; stage.height = H * DPR; ctx.setTransform(DPR, 0, 0, DPR, 0, 0); }
+addEventListener('resize', resize); resize();
+
+/* ---------- Setup ---------- */
+let crop = 'bottom', speed = 1, fileURL = null;
+const CROPS = { bottom: [0.31, 1.0], top: [0.0, 0.31], full: [0.0, 1.0] }; // vertical range of the video to use
+function seg(id, cb) {
+  $(id).querySelectorAll('button').forEach(b => b.onclick = () => {
+    $(id).querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); cb(b.dataset.v);
+  });
+}
+seg('cropSeg', v => crop = v);
+seg('speedSeg', v => speed = parseFloat(v));
+$('fileIn').onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  if (fileURL) URL.revokeObjectURL(fileURL);
+  fileURL = URL.createObjectURL(f);
+  $('fileName').textContent = f.name;
+  const pv = $('preview'); pv.src = fileURL; pv.style.display = 'block'; pv.currentTime = 1;
+  $('startBtn').disabled = false;
+};
+
+/* ---------- MediaPipe ---------- */
+let fileset = null, camPose = null, refPose = null;
+async function makePose(delegate) {
+  return PoseLandmarker.createFromOptions(fileset, {
+    baseOptions: { modelAssetPath: POSE_MODEL, delegate },
+    runningMode: 'VIDEO', numPoses: 1,
+    minPoseDetectionConfidence: 0.5, minPosePresenceConfidence: 0.5, minTrackingConfidence: 0.5
+  });
+}
+async function loadModels() {
+  if (camPose && refPose) return;
+  fileset = await FilesetResolver.forVisionTasks(WASM);
+  try { camPose = await makePose('GPU'); } catch (e) { camPose = await makePose('CPU'); }
+  refPose = await makePose('CPU'); // separate models so they don't contend for the GPU
+}
+
+/* ---------- Pose features ---------- */
+// Convert to on-screen pixel positions; the camera view is mirrored, so flip x
+function toScreen(lms, w, h, mirror) {
+  return lms.map(p => ({ X: (mirror ? 1 - p.x : p.x) * w, Y: p.y * h, v: p.visibility ?? 1 }));
+}
+// Split arms by screen side (not anatomical side), so mirrored and unmirrored views compare directly
+function features(pts) {
+  const a = pts[11], b = pts[12];
+  if (!a || !b || a.v < 0.4 || b.v < 0.4) return null;
+  const [sl, sr] = a.X < b.X ? [11, 12] : [12, 11];
+  const cx = (a.X + b.X) / 2, cy = (a.Y + b.Y) / 2;
+  const sc = Math.max(10, Math.hypot(a.X - b.X, a.Y - b.Y));
+  const n = i => ({ x: (pts[i].X - cx) / sc, y: (pts[i].Y - cy) / sc, v: pts[i].v });
+  const arm = s => ({ sh: n(s), el: n(s + 2), wr: n(s + 4), ix: n(s + 8) });
+  return { L: arm(sl), R: arm(sr), nose: n(0), cx, cy, sc };
+}
+const unit = (p, q) => { const dx = q.x - p.x, dy = q.y - p.y, d = Math.hypot(dx, dy) || 1; return { x: dx / d, y: dy / d }; };
+function similarity(u, r) {
+  if (!u || !r) return 0;
+  let ang = 0, angN = 0, pos = 0, posN = 0;
+  for (const side of ['L', 'R']) {
+    const A = u[side], B = r[side];
+    for (const [p, q, wgt] of [['sh', 'el', 1], ['el', 'wr', 1.3]]) {
+      const ok = A[q].v > 0.35 && B[q].v > 0.35;
+      if (!ok) { ang += ((A[q].v > 0.35) === (B[q].v > 0.35) ? 0.8 : 0.3) * wgt; angN += wgt; continue; }
+      const a = unit(A[p], A[q]), b = unit(B[p], B[q]);
+      const dot = a.x * b.x + a.y * b.y;
+      ang += Math.pow((dot + 1) / 2, 3) * wgt; angN += wgt;
+    }
+    for (const [k, wgt] of [['wr', 1], ['ix', 1]]) {
+      const ok = A[k].v > 0.35 && B[k].v > 0.35;
+      if (!ok) { pos += ((A[k].v > 0.35) === (B[k].v > 0.35) ? 0.8 : 0.3) * wgt; posN += wgt; continue; }
+      const d = Math.hypot(A[k].x - B[k].x, A[k].y - B[k].y);
+      pos += Math.exp(-(d * d) / (2 * 0.45 * 0.45)) * wgt; posN += wgt;
+    }
+  }
+  return 0.5 * (ang / angN) + 0.5 * (pos / posN);
+}
+
+/* ---------- Game state ---------- */
+const PERFECT = 0.85, GOOD = 0.75;   // thresholds calibrated with perfect, human, still and unrelated simulated followers
+const LAG_MS = 700;                  // how far behind the teacher you may be
+const BEAT_MS = 900;                 // how often a beat is judged
+let refHist = [], userFeat = null, userPts = null, refPts = null, ghost = null;
+let running = false, lastRefT = -1, lastCamT = -1, beatSims = [], lastBeat = 0;
+let score = 0, combo = 0, nP = 0, nG = 0, nM = 0, simSum = 0, simN = 0, curSim = 0, showGhost = true;
+let judge = null; const parts = [];
+const refCanvas = document.createElement('canvas'), rcx = refCanvas.getContext('2d');
+
+function resetGame() {
+  refHist = []; beatSims = []; score = combo = nP = nG = nM = 0; simSum = simN = 0; curSim = 0; judge = null; parts.length = 0;
+  $('score').textContent = 0; $('combo').textContent = 0;
+}
+
+/* ---------- Layout: teacher on the left, you on the right ---------- */
+function layout() {
+  const portrait = H > W;
+  if (portrait) return { ref: { x: 0, y: 0, w: W, h: H / 2 }, cam: { x: 0, y: H / 2, w: W, h: H / 2 } };
+  return { ref: { x: 0, y: 0, w: W / 2, h: H }, cam: { x: W / 2, y: 0, w: W / 2, h: H } };
+}
+function fitContain(sw, sh, box) { const s = Math.min(box.w / sw, box.h / sh); const w = sw * s, h = sh * s; return { x: box.x + (box.w - w) / 2, y: box.y + (box.h - h) / 2, w, h }; }
+function fitCover(sw, sh, box) { const s = Math.max(box.w / sw, box.h / sh); const w = sw * s, h = sh * s; return { x: box.x + (box.w - w) / 2, y: box.y + (box.h - h) / 2, w, h }; }
+
+const BONES = [[11, 12], [11, 13], [13, 15], [12, 14], [14, 16], [15, 19], [16, 20], [15, 17], [16, 18], [11, 23], [12, 24], [23, 24]];
+function drawSkeleton(pts, color, width, alpha) {
+  if (!pts) return;
+  ctx.save(); ctx.globalAlpha = alpha; ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = 'round';
+  ctx.shadowColor = color; ctx.shadowBlur = 10;
+  for (const [a, b] of BONES) {
+    const p = pts[a], q = pts[b]; if (!p || !q || p.v < 0.35 || q.v < 0.35) continue;
+    ctx.beginPath(); ctx.moveTo(p.X, p.Y); ctx.lineTo(q.X, q.Y); ctx.stroke();
+  }
+  ctx.fillStyle = color;
+  for (const i of [0, 15, 16, 19, 20]) { const p = pts[i]; if (p && p.v > 0.35) { ctx.beginPath(); ctx.arc(p.X, p.Y, width * 0.9, 0, Math.PI * 2); ctx.fill(); } }
+  ctx.restore();
+}
+// Map the teacher's pose onto your shoulders and draw it as a translucent target pose
+function ghostOnUser(rf, uf) {
+  if (!rf || !uf) return null;
+  const out = [];
+  const put = (i, p) => out[i] = { X: uf.cx + p.x * uf.sc, Y: uf.cy + p.y * uf.sc, v: p.v };
+  // Screen-left arm drawn on slots 11/13/15/19, screen-right on 12/14/16/20
+  const map = (arm, base) => { put(base, arm.sh); put(base + 2, arm.el); put(base + 4, arm.wr); put(base + 8, arm.ix); };
+  map(rf.L, 11); map(rf.R, 12); put(0, rf.nose);
+  return out;
+}
+
+/* ---------- Effects ---------- */
+class Spark {
+  constructor(x, y, color, big) {
+    const a = Math.random() * Math.PI * 2, s = (big ? 3 : 1.5) + Math.random() * 3;
+    this.x = x; this.y = y; this.vx = Math.cos(a) * s; this.vy = Math.sin(a) * s - 1.5;
+    this.r = (big ? 6 : 3) + Math.random() * 4; this.life = 1; this.color = color; this.heart = Math.random() < 0.4;
+  }
+  step() { this.x += this.vx; this.y += this.vy; this.vy += 0.06; this.vx *= 0.97; this.life -= 0.022; }
+  draw() {
+    ctx.save(); ctx.globalAlpha = Math.max(0, this.life); ctx.fillStyle = this.color; ctx.shadowColor = this.color; ctx.shadowBlur = 12;
+    ctx.translate(this.x, this.y);
+    if (this.heart) { const s = this.r * 1.4; ctx.beginPath(); ctx.moveTo(0, s * .35); ctx.bezierCurveTo(-s * 1.1, -s * .35, -s * .55, -s * 1.1, 0, -s * .5); ctx.bezierCurveTo(s * .55, -s * 1.1, s * 1.1, -s * .35, 0, s * .35); ctx.fill(); }
+    else { ctx.beginPath(); ctx.arc(0, 0, this.r, 0, Math.PI * 2); ctx.fill(); }
+    ctx.restore();
+  }
+}
+function burst(kind) {
+  if (!userPts) return;
+  const colors = kind === 'perfect' ? ['#ff6fae', '#ffd1e6', '#fff3a8', '#ffffff'] : ['#b98bff', '#d9c7ff', '#ffffff'];
+  for (const i of [15, 16]) {
+    const p = userPts[i]; if (!p || p.v < 0.35) continue;
+    for (let k = 0; k < (kind === 'perfect' ? 22 : 10); k++) parts.push(new Spark(p.X, p.Y, colors[k % colors.length], kind === 'perfect'));
+  }
+}
+
+/* ---------- Main loop ---------- */
+function loop() {
+  if (!running) return;
+  requestAnimationFrame(loop);
+  const now = performance.now();
+  const L = layout();
+  ctx.fillStyle = '#160d1a'; ctx.fillRect(0, 0, W, H);
+
+  // Teacher: crop the chosen region
+  let refBox = null;
+  if (refV.readyState >= 2) {
+    const vw = refV.videoWidth, vh = refV.videoHeight, [y0, y1] = CROPS[crop];
+    const sy = vh * y0, sh = vh * (y1 - y0);
+    refBox = fitContain(vw, sh, L.ref);
+    ctx.drawImage(refV, 0, sy, vw, sh, refBox.x, refBox.y, refBox.w, refBox.h);
+    // Detect the teacher's pose (about 15 times per second)
+    if (refV.currentTime !== lastRefT && now - (loop.lastRefDet || 0) > 60) {
+      loop.lastRefDet = now; lastRefT = refV.currentTime;
+      const dw = 360, dh = Math.round(360 * sh / vw);
+      if (refCanvas.width !== dw || refCanvas.height !== dh) { refCanvas.width = dw; refCanvas.height = dh; }
+      rcx.drawImage(refV, 0, sy, vw, sh, 0, 0, dw, dh);
+      try {
+        const r = refPose.detectForVideo(refCanvas, now);
+        if (r.landmarks && r.landmarks[0]) {
+          const pts = toScreen(r.landmarks[0], refBox.w, refBox.h, false);
+          refPts = pts.map(p => ({ X: p.X + refBox.x, Y: p.Y + refBox.y, v: p.v }));
+          const f = features(pts);
+          if (f) { refHist.push({ t: now, f }); }
+        }
+      } catch (e) { }
+      while (refHist.length && now - refHist[0].t > LAG_MS + 300) refHist.shift();
+    }
+  }
+  if (refPts) drawSkeleton(refPts, '#ffffff', 3, 0.35);
+
+  // You: mirrored camera view
+  if (camV.readyState >= 2) {
+    const cw = camV.videoWidth, ch = camV.videoHeight;
+    const box = fitCover(cw, ch, L.cam);
+    ctx.save(); ctx.beginPath(); ctx.rect(L.cam.x, L.cam.y, L.cam.w, L.cam.h); ctx.clip();
+    ctx.translate(box.x + box.w, box.y); ctx.scale(-1, 1); ctx.drawImage(camV, 0, 0, box.w, box.h);
+    ctx.restore();
+    if (camV.currentTime !== lastCamT) {
+      lastCamT = camV.currentTime;
+      try {
+        const r = camPose.detectForVideo(camV, now);
+        if (r.landmarks && r.landmarks[0]) {
+          const pts = toScreen(r.landmarks[0], box.w, box.h, true);
+          userPts = pts.map(p => ({ X: p.X + box.x, Y: p.Y + box.y, v: p.v }));
+          userFeat = features(pts);
+          if (userFeat) { userFeat.cx += box.x; userFeat.cy += box.y; }
+        } else { userPts = null; userFeat = null; }
+      } catch (e) { }
+    }
+  }
+
+  // Compare with the teacher's poses from the last 0.7 s and keep the best match (so being half a beat late is fine)
+  if (userFeat && refHist.length) {
+    let best = 0, bestF = null;
+    for (const h of refHist) { if (now - h.t > LAG_MS) continue; const s = similarity(userFeat, h.f); if (s > best) { best = s; bestF = h.f; } }
+    curSim = best; ghost = bestF ? ghostOnUser(bestF, userFeat) : null;
+  } else { curSim = 0; ghost = null; }
+  if (!refV.paused) beatSims.push(curSim);
+
+  if (showGhost && ghost) drawSkeleton(ghost, '#ffffff', 7, 0.45);
+  if (userPts) drawSkeleton(userPts, curSim >= PERFECT ? '#ff6fae' : curSim >= GOOD ? '#b98bff' : '#8ad8ff', 4, 0.9);
+
+  // Judge once per beat
+  if (!refV.paused && now - lastBeat > BEAT_MS / speed) {
+    lastBeat = now;
+    if (beatSims.length) {
+      const sorted = [...beatSims].sort((a, b) => b - a);
+      const s = sorted[Math.floor(sorted.length * 0.25)]; // your better moments within this beat
+      simSum += s; simN++;
+      let kind;
+      if (!userFeat && s === 0) kind = 'miss';
+      else kind = s >= PERFECT ? 'perfect' : s >= GOOD ? 'good' : 'miss';
+      if (kind === 'perfect') { nP++; combo++; score += 100 + Math.min(combo, 20) * 5; }
+      else if (kind === 'good') { nG++; combo++; score += 60 + Math.min(combo, 20) * 2; }
+      else { nM++; combo = 0; }
+      judge = { kind, t: now }; if (kind !== 'miss') burst(kind);
+      $('score').textContent = score; $('combo').textContent = combo;
+    }
+    beatSims = [];
+  }
+  $('simTxt').textContent = 'Match ' + Math.round(curSim * 100) + '%';
+
+  // Judgement text
+  if (judge && now - judge.t < 700) {
+    const k = (now - judge.t) / 700, txt = judge.kind === 'perfect' ? 'Perfect!' : judge.kind === 'good' ? 'Good' : 'Miss';
+    const col = judge.kind === 'perfect' ? '#ff6fae' : judge.kind === 'good' ? '#b98bff' : '#9aa7b5';
+    ctx.save(); ctx.globalAlpha = 1 - k; ctx.font = `800 ${56 + 18 * (1 - k)}px -apple-system, sans-serif`; ctx.textAlign = 'center';
+    ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 24;
+    ctx.fillText(txt, L.cam.x + L.cam.w / 2, L.cam.y + L.cam.h * 0.22 - k * 30); ctx.restore();
+  }
+  for (const p of parts) { p.step(); p.draw(); }
+  for (let i = parts.length - 1; i >= 0; i--) if (parts[i].life <= 0) parts.splice(i, 1);
+
+  // Labels
+  ctx.save(); ctx.font = '600 14px -apple-system, "PingFang TC", sans-serif'; ctx.fillStyle = 'rgba(255,255,255,.8)';
+  ctx.fillText('Teacher', L.ref.x + 16, L.ref.y + L.ref.h - 18); ctx.fillText('You (follow like a mirror)', L.cam.x + 16, L.cam.y + L.cam.h - 18); ctx.restore();
+
+  if (refV.duration) $('barFill').style.width = (refV.currentTime / refV.duration * 100) + '%';
+}
+
+/* ---------- Start / finish ---------- */
+let rec = null, recChunks = [], recURL = null, recType = 'video/webm';
+async function start() {
+  $('err').textContent = ''; $('startBtn').disabled = true; $('startBtn').textContent = 'Loading…';
+  // iPhone: play once during the tap so later playback is allowed to have sound
+  try { refV.src = fileURL; refV.muted = false; const pp = refV.play(); if (pp) pp.then(() => refV.pause()).catch(() => {}); } catch (e) { }
+  try {
+    if (!camV.srcObject) {
+      camV.srcObject = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' }, audio: false });
+      await camV.play();
+    }
+    await loadModels();
+  } catch (e) {
+    console.error(e); $('startBtn').disabled = false; $('startBtn').textContent = 'Turn on camera & dance 💃';
+    $('err').textContent = 'Could not open the camera or load the models. Please allow camera access, check your internet connection, and use Chrome or Safari. (' + (e.message || e) + ')';
+    return;
+  }
+  if (refV.src !== fileURL) refV.src = fileURL; refV.pause(); refV.playbackRate = speed; refV.currentTime = 0;
+  await new Promise(r => refV.readyState >= 1 ? r() : refV.onloadedmetadata = r);
+  $('setup').classList.add('hidden'); $('result').classList.add('hidden');
+  ['hud', 'tools', 'bar'].forEach(id => $(id).classList.remove('hidden'));
+  resetGame(); running = true; loop();
+  // 3-second countdown
+  const cd = $('countdown'); cd.classList.remove('hidden');
+  for (const n of ['3', '2', '1']) { cd.textContent = n; await new Promise(r => setTimeout(r, 800)); }
+  cd.classList.add('hidden');
+  refV.playbackRate = speed; lastBeat = performance.now();
+  refV.muted = false;
+  try { await refV.play(); } catch (e) { refV.muted = true; await refV.play(); }
+  $('startBtn').textContent = 'Turn on camera & dance 💃'; $('startBtn').disabled = false;
+}
+function finish() {
+  if (!running) return;
+  running = false; refV.pause();
+  if (rec && rec.state !== 'inactive') rec.stop();
+  ['hud', 'tools', 'bar'].forEach(id => $(id).classList.add('hidden'));
+  const avg = simN ? simSum / simN : 0;
+  const total = nP + nG + nM || 1, ratio = (nP + nG * 0.6) / total;
+  const grade = ratio >= 0.8 ? 'S' : ratio >= 0.6 ? 'A' : ratio >= 0.4 ? 'B' : ratio >= 0.2 ? 'C' : 'D';
+  $('gradeTxt').textContent = grade; $('finalScore').textContent = score; $('finalSim').textContent = Math.round(avg * 100) + '%';
+  $('nPerfect').textContent = nP; $('nGood').textContent = nG; $('nMiss').textContent = nM;
+  $('result').classList.remove('hidden');
+  window.__grade = grade;
+}
+refV.onended = finish;
+$('startBtn').onclick = start;
+$('againBtn').onclick = start;
+$('stopBtn').onclick = finish;
+$('backBtn').onclick = () => { $('result').classList.add('hidden'); $('setup').classList.remove('hidden'); };
+$('ghostBtn').onclick = () => { showGhost = !showGhost; $('ghostBtn').classList.toggle('on', showGhost); };
+
+// Recording: capture the whole stage (teacher + you + effects) with the music
+$('recBtn').onclick = () => {
+  if (rec && rec.state === 'recording') { rec.stop(); return; }
+  try {
+    const stream = stage.captureStream(30);
+    try { const a = (refV.captureStream ? refV.captureStream() : refV.mozCaptureStream()).getAudioTracks(); a.forEach(t => stream.addTrack(t)); } catch (e) { }
+    const mime = ['video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'].find(m => MediaRecorder.isTypeSupported(m)) || '';
+    rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined); recChunks = [];
+    rec.ondataavailable = e => e.data.size && recChunks.push(e.data);
+    rec.onstop = () => {
+      $('recBtn').classList.remove('on'); $('recBtn').textContent = '⏺ Record';
+      if (recURL) URL.revokeObjectURL(recURL);
+      recType = rec.mimeType || 'video/webm';
+      recURL = URL.createObjectURL(new Blob(recChunks, { type: recType }));
+      $('dlBtn').classList.remove('hidden');
+    };
+    rec.start(); $('recBtn').classList.add('on'); $('recBtn').textContent = '⏹ Stop recording';
+  } catch (e) { console.error(e); $('recBtn').textContent = 'Recording not supported'; }
+};
+$('dlBtn').onclick = () => { if (!recURL) return; const a = document.createElement('a'); a.href = recURL; a.download = 'gesture-dance.' + (recType.includes('mp4') ? 'mp4' : 'webm'); a.click(); };
+
+// for automated tests
+window.__dance = () => ({ curSim, nP, nG, nM, score, simN, avg: simN ? simSum / simN : 0, refN: refHist.length, user: !!userFeat });
+</script>
+</body>
+</html>

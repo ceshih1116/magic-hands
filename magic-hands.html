@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Magic Hands · Gesture Effects</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0b0710; font-family: -apple-system, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif; }
+  video { position: fixed; left: 0; top: 0; width: 2px; height: 2px; opacity: 0.01; pointer-events: none; z-index: -1; } /* iPhone Safari will not play a display:none video */
+  canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
+
+  .ui { transition: opacity .35s ease; }
+  body.hide-ui .ui { opacity: 0; pointer-events: none; }
+  body.hide-ui #eyeBtn { opacity: .18; }
+  body.hide-ui #eyeBtn:hover { opacity: .8; }
+
+  #status {
+    position: fixed; top: 18px; left: 18px; z-index: 10;
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 14px 7px 11px; border-radius: 999px;
+    background: rgba(20, 14, 28, .45); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    color: #fff; font-size: 14px; letter-spacing: .5px;
+    border: 1px solid rgba(255,255,255,.18);
+  }
+  #dot { width: 9px; height: 9px; border-radius: 50%; background: #888; box-shadow: 0 0 8px currentColor; }
+  #meter { display: none; position: relative; width: 70px; height: 8px; border-radius: 4px; background: rgba(255,255,255,.2); overflow: hidden; margin-left: 4px; }
+  #meter.show { display: inline-block; }
+  #meter i { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: linear-gradient(90deg,#9fe7ff,#ffffff); border-radius: 4px; }
+  #meter b { position: absolute; left: 60%; top: -2px; bottom: -2px; width: 2px; background: #ff8ac2; }
+  #dot.on { background: #6dffb0; color: #6dffb0; }
+
+  #toolbar { position: fixed; top: 18px; right: 18px; z-index: 10; display: flex; gap: 8px; }
+  .btn {
+    height: 38px; min-width: 38px; padding: 0 12px; border-radius: 999px; cursor: pointer;
+    background: rgba(20, 14, 28, .45); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    color: #fff; font-size: 14px; border: 1px solid rgba(255,255,255,.18);
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .btn:hover { background: rgba(255,255,255,.18); }
+  .btn.active { background: rgba(255, 150, 200, .45); }
+  #eyeBtn { position: fixed; top: 18px; right: 18px; z-index: 11; transition: opacity .35s; }
+  #toolbar { right: 64px; }
+
+  #msgPanel {
+    position: fixed; top: 66px; right: 18px; z-index: 10; display: none;
+    padding: 12px; border-radius: 16px; width: 270px;
+    background: rgba(20, 14, 28, .6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,.18); color: #fff; font-size: 13px;
+  }
+  #msgPanel.open { display: block; }
+  #msgPanel label { display: block; margin: 6px 0 4px; opacity: .8; }
+  #msgPanel input {
+    width: 100%; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,.25);
+    background: rgba(255,255,255,.1); color: #fff; font-size: 15px; outline: none;
+  }
+
+  #start {
+    position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 22px; color: #fff; text-align: center;
+    background: radial-gradient(ellipse at center, #3a1d3f 0%, #120a18 70%);
+  }
+  #start h1 { font-size: 34px; font-weight: 600; letter-spacing: 2px; }
+  #start p { opacity: .75; line-height: 1.9; font-size: 15px; max-width: 560px; padding: 0 20px; }
+  #startBtn {
+    padding: 14px 34px; border-radius: 999px; border: none; cursor: pointer; font-size: 17px; color: #fff;
+    background: linear-gradient(135deg, #ff8ac2, #b98bff); box-shadow: 0 8px 30px rgba(255, 138, 194, .45);
+  }
+  #startBtn:disabled { opacity: .6; cursor: wait; }
+  #err { color: #ffb3b3; font-size: 14px; max-width: 460px; }
+</style>
+</head>
+<body>
+<video id="video" playsinline muted></video>
+<canvas id="c"></canvas>
+
+<div id="status" class="ui"><span id="dot"></span><span id="gestureText">Waiting for camera…</span><span id="meter" title="How open your mouth is"><i id="meterFill"></i><b></b></span></div>
+
+<div id="toolbar" class="ui">
+  <button class="btn active" id="modeFlower" title="Flower mode">🌸 Flowers</button>
+  <button class="btn" id="modeLetter" title="Fingertip love letter mode">💌 Letter</button>
+  <button class="btn" id="modeFog" title="Breathe-and-write fog mode">🌫 Fog</button>
+  <button class="btn" id="editBtn" title="Edit text">✏️</button>
+  <button class="btn" id="fsBtn" title="Fullscreen">⛶</button>
+</div>
+<button class="btn" id="eyeBtn" title="Hide the interface (or press H)">👁</button>
+
+<div id="msgPanel" class="ui">
+  <label>Words on your fingertips (thumb first, up to 10 fingers)<br>Separate words with spaces: one word per finger. Without spaces, one character per finger.</label>
+  <input id="msgInput" maxlength="80" value="I Love You So Much">
+  <label>Text shown with the two-hand heart</label>
+  <input id="toInput" maxlength="20" value="to you">
+</div>
+
+<div id="start">
+  <h1>✿ Magic Hands ✿</h1>
+  <p>🖐 Open palm → flowers bloom and butterflies fly out<br>🫶 Two-hand heart → a burst of hearts<br>🫰 Finger heart → little sticker hearts<br>✌️ Peace sign → collect the flowers back<br>🌫 Fog mode: open your mouth and go "haaa" to fog the glass, write with your index finger (it stays until your next breath), wipe with an open palm. Holding the space bar also fogs the glass.</p>
+  <button id="startBtn">Turn on camera</button>
+  <div id="err"></div>
+</div>
+
+<script type="module">
+import { FilesetResolver, HandLandmarker, FaceLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs";
+
+const video = document.getElementById('video');
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const dot = document.getElementById('dot');
+const gestureText = document.getElementById('gestureText');
+const meterEl = document.getElementById('meter'), meterFill = document.getElementById('meterFill');
+const msgInput = document.getElementById('msgInput');
+const toInput = document.getElementById('toInput');
+
+let W = 0, H = 0, DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+/* Fog layers (low resolution; upscaling gives soft edges) */
+const FS = 0.4;
+const fogMask = document.createElement('canvas'), fmx = fogMask.getContext('2d');
+const fogLayer = document.createElement('canvas'), flx = fogLayer.getContext('2d');
+const speckle = document.createElement('canvas'), spx = speckle.getContext('2d');
+const strokeMask = document.createElement('canvas'), smx = strokeMask.getContext('2d'); // writing traced by the finger
+function resizeFog() {
+  const fw = Math.ceil(W * FS), fh = Math.ceil(H * FS);
+  for (const c of [fogMask, fogLayer, speckle, strokeMask]) { c.width = fw; c.height = fh; }
+  // Tiny droplet texture
+  spx.clearRect(0, 0, fw, fh);
+  for (let i = 0; i < fw * fh / 90; i++) {
+    spx.fillStyle = `rgba(255,255,255,${Math.random() * 0.35})`;
+    spx.beginPath(); spx.arc(Math.random() * fw, Math.random() * fh, Math.random() * 1.4 + 0.3, 0, Math.PI * 2); spx.fill();
+  }
+}
+
+function resize() {
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = W * DPR; canvas.height = H * DPR;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  resizeFog();
+}
+window.addEventListener('resize', resize); resize();
+
+/* ---------------- UI ---------------- */
+let mode = 'flower';
+const modeFlower = document.getElementById('modeFlower');
+const modeLetter = document.getElementById('modeLetter');
+const modeFog = document.getElementById('modeFog');
+function setMode(m) {
+  mode = m;
+  modeFlower.classList.toggle('active', m === 'flower');
+  modeLetter.classList.toggle('active', m === 'letter');
+  modeFog.classList.toggle('active', m === 'fog');
+  if (m !== 'fog') { fmx.clearRect(0, 0, fogMask.width, fogMask.height); smx.clearRect(0, 0, strokeMask.width, strokeMask.height); }
+}
+modeFlower.onclick = () => setMode('flower');
+modeLetter.onclick = () => setMode('letter');
+modeFog.onclick = () => setMode('fog');
+document.getElementById('editBtn').onclick = () => document.getElementById('msgPanel').classList.toggle('open');
+document.getElementById('eyeBtn').onclick = () => document.body.classList.toggle('hide-ui');
+document.getElementById('fsBtn').onclick = () => {
+  try { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); } catch (e) {}
+};
+window.addEventListener('keyup', e => { if (e.code === 'Space') spaceHeld = false; });
+window.addEventListener('keydown', e => {
+  if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
+  if (e.code === 'Space') { spaceHeld = true; e.preventDefault(); }
+  if (e.key === 'h' || e.key === 'H') document.body.classList.toggle('hide-ui');
+  if (e.key === '1') setMode('flower');
+  if (e.key === '2') setMode('letter');
+  if (e.key === '3') setMode('fog');
+});
+
+/* ---------------- Particles ---------------- */
+const FLOWER_COLORS = [
+  ['#ffe3f1', '#ff9fcb'], ['#fff6fb', '#ffc2de'], ['#fdf0ff', '#d9a6ff'],
+  ['#fff9e8', '#ffd38a'], ['#eef6ff', '#a9cfff'], ['#ffffff', '#ffd1e6']
+];
+const BUTTERFLY_COLORS = ['#ff9fd0', '#b6a2ff', '#8fd9ff', '#ffd27f', '#ffffff'];
+let particles = [];
+const MAX_PARTICLES = 650;
+const rand = (a, b) => a + Math.random() * (b - a);
+const pick = arr => arr[(Math.random() * arr.length) | 0];
+
+class Flower {
+  constructor(x, y, scale) {
+    this.type = 'flower';
+    this.x = x; this.y = y;
+    const ang = rand(-Math.PI * 0.95, -Math.PI * 0.05);
+    const sp = rand(1.2, 3.6) * scale;
+    this.vx = Math.cos(ang) * sp; this.vy = Math.sin(ang) * sp;
+    this.size = 0; this.maxSize = rand(9, 20) * scale;
+    this.rot = rand(0, Math.PI * 2); this.vr = rand(-0.04, 0.04);
+    this.life = 1; this.decay = rand(0.004, 0.008);
+    this.colors = pick(FLOWER_COLORS);
+    this.petals = Math.random() < 0.7 ? 5 : 6;
+  }
+  update() {
+    this.x += this.vx; this.y += this.vy;
+    this.vx *= 0.985; this.vy = this.vy * 0.985 + 0.012;
+    this.size += (this.maxSize - this.size) * 0.12;
+    this.rot += this.vr; this.life -= this.decay;
+  }
+  draw() {
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, Math.min(1, this.life * 1.4));
+    ctx.translate(this.x, this.y); ctx.rotate(this.rot);
+    const s = this.size;
+    ctx.shadowColor = this.colors[1]; ctx.shadowBlur = 14;
+    for (let i = 0; i < this.petals; i++) {
+      ctx.rotate((Math.PI * 2) / this.petals);
+      const g = ctx.createRadialGradient(0, -s * 0.5, 0, 0, -s * 0.5, s * 0.7);
+      g.addColorStop(0, this.colors[0]); g.addColorStop(1, this.colors[1]);
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.bezierCurveTo(s * 0.55, -s * 0.35, s * 0.45, -s * 1.0, 0, -s * 0.92);
+      ctx.bezierCurveTo(-s * 0.45, -s * 1.0, -s * 0.55, -s * 0.35, 0, 0);
+      ctx.fill();
+    }
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#ffe58a';
+    ctx.beginPath(); ctx.arc(0, 0, s * 0.18, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+}
+
+class Petal {
+  constructor(x, y, scale) {
+    this.type = 'petal';
+    this.x = x + rand(-20, 20) * scale; this.y = y + rand(-20, 20) * scale;
+    const ang = rand(-Math.PI, 0); const sp = rand(0.6, 2.4) * scale;
+    this.vx = Math.cos(ang) * sp; this.vy = Math.sin(ang) * sp;
+    this.size = rand(4, 8) * scale; this.rot = rand(0, 6.28); this.vr = rand(-0.08, 0.08);
+    this.flip = rand(0, 6.28);
+    this.life = 1; this.decay = rand(0.005, 0.01);
+    this.color = pick(['#ffc6df', '#ffe1ee', '#ffffff', '#f5c2ff']);
+  }
+  update() {
+    this.flip += 0.08;
+    this.x += this.vx + Math.sin(this.flip) * 0.6; this.y += this.vy;
+    this.vx *= 0.99; this.vy = this.vy * 0.99 + 0.02;
+    this.rot += this.vr; this.life -= this.decay;
+  }
+  draw() {
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, this.life);
+    ctx.translate(this.x, this.y); ctx.rotate(this.rot);
+    ctx.scale(1, Math.abs(Math.cos(this.flip)) * 0.8 + 0.2);
+    ctx.fillStyle = this.color; ctx.shadowColor = '#ff9fcb'; ctx.shadowBlur = 8;
+    const s = this.size;
+    ctx.beginPath();
+    ctx.moveTo(0, -s);
+    ctx.quadraticCurveTo(s * 0.9, -s * 0.2, 0, s);
+    ctx.quadraticCurveTo(-s * 0.9, -s * 0.2, 0, -s);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+class Butterfly {
+  constructor(x, y, scale) {
+    this.type = 'butterfly';
+    this.x = x; this.y = y;
+    this.vx = rand(-1.6, 1.6) * scale; this.vy = rand(-2.2, -1.0) * scale;
+    this.size = rand(13, 22) * scale; this.phase = rand(0, 6.28);
+    this.wander = rand(0, 6.28);
+    this.life = 1; this.decay = rand(0.0025, 0.0045);
+    this.color = pick(BUTTERFLY_COLORS);
+  }
+  update() {
+    this.phase += 0.35; this.wander += rand(-0.15, 0.15);
+    this.vx += Math.cos(this.wander) * 0.06; this.vy += Math.sin(this.wander) * 0.04 - 0.01;
+    this.vx *= 0.98; this.vy *= 0.98;
+    this.x += this.vx; this.y += this.vy + Math.sin(this.phase * 0.5) * 0.4;
+    this.life -= this.decay;
+  }
+  draw() {
+    const flap = Math.abs(Math.sin(this.phase)) * 0.85 + 0.15;
+    const s = this.size;
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, Math.min(1, this.life * 2));
+    ctx.translate(this.x, this.y);
+    ctx.rotate(Math.atan2(this.vy, this.vx) + Math.PI / 2);
+    ctx.shadowColor = this.color; ctx.shadowBlur = 16;
+    for (const side of [-1, 1]) {
+      ctx.save(); ctx.scale(side * flap, 1);
+      const g = ctx.createLinearGradient(0, 0, s, 0);
+      g.addColorStop(0, '#ffffff'); g.addColorStop(1, this.color);
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.ellipse(s * 0.5, -s * 0.3, s * 0.55, s * 0.42, -0.5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(s * 0.38, s * 0.3, s * 0.36, s * 0.28, 0.6, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+    ctx.shadowBlur = 0; ctx.fillStyle = '#5a3a55';
+    ctx.beginPath(); ctx.ellipse(0, 0, s * 0.07, s * 0.42, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+}
+
+class Heart {
+  constructor(x, y, scale, big) {
+    this.type = 'heart';
+    this.x = x + rand(-30, 30) * scale; this.y = y + rand(-20, 20) * scale;
+    const ang = rand(-Math.PI * 0.85, -Math.PI * 0.15);
+    const sp = (big ? rand(1.5, 5) : rand(0.8, 2.2)) * scale;
+    this.vx = Math.cos(ang) * sp; this.vy = Math.sin(ang) * sp;
+    this.size = (big ? rand(10, 26) : rand(6, 13)) * scale;
+    this.life = 1; this.decay = rand(0.006, 0.012);
+    this.color = pick(['#ff5fa2', '#ff8dc0', '#ff3d7f', '#ffb6d5', '#ffffff']);
+    this.wob = rand(0, 6.28);
+  }
+  update() {
+    this.wob += 0.1;
+    this.x += this.vx + Math.sin(this.wob) * 0.5; this.y += this.vy;
+    this.vx *= 0.985; this.vy = this.vy * 0.985 - 0.01;
+    this.life -= this.decay;
+  }
+  draw() {
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, Math.min(1, this.life * 1.5));
+    ctx.translate(this.x, this.y);
+    const s = this.size * (1 + Math.sin(this.wob * 1.5) * 0.06);
+    ctx.fillStyle = this.color; ctx.shadowColor = '#ff5fa2'; ctx.shadowBlur = 18;
+    drawHeartPath(s); ctx.fill();
+    ctx.restore();
+  }
+}
+
+class Sparkle {
+  constructor(x, y) {
+    this.type = 'sparkle';
+    this.x = x + rand(-6, 6); this.y = y + rand(-6, 6);
+    this.vx = rand(-0.6, 0.6); this.vy = rand(-1.2, 0.2);
+    this.size = rand(1.5, 3.5); this.life = 1; this.decay = rand(0.02, 0.04);
+    this.color = pick(['#ffffff', '#ffe0f0', '#ffd6a5', '#e3d4ff']);
+  }
+  update() { this.x += this.vx; this.y += this.vy; this.life -= this.decay; }
+  draw() {
+    ctx.save(); ctx.globalAlpha = Math.max(0, this.life);
+    ctx.fillStyle = this.color; ctx.shadowColor = this.color; ctx.shadowBlur = 10;
+    ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+}
+
+// 🫰 Finger-heart effect: glossy sticker-style hearts that pop out, then float up
+class PopHeart {
+  constructor(x, y, scale, big) {
+    this.type = 'pop';
+    this.x = x; this.y = y;
+    this.vx = rand(-0.6, 0.6) * scale; this.vy = rand(-1.6, -0.9) * scale;
+    this.target = (big ? rand(26, 32) : rand(13, 19)) * scale;
+    this.age = 0; this.life = 1; this.decay = big ? 0.007 : rand(0.008, 0.012);
+    this.rot = rand(-0.25, 0.25); this.wob = rand(0, 6.28);
+    this.hue = pick([['#ff2a5f', '#ff7aa2'], ['#ff3b3b', '#ff8a8a'], ['#ff4f9a', '#ffa3c9']]);
+  }
+  update() {
+    this.age++; this.wob += 0.08;
+    this.x += this.vx + Math.sin(this.wob) * 0.5; this.y += this.vy;
+    this.vy *= 0.995; this.life -= this.decay;
+  }
+  draw() {
+    // Bounce scale: 0 → 1.25 → 1
+    const t = Math.min(1, this.age / 14);
+    const bounce = t < 0.6 ? (t / 0.6) * 1.25 : 1.25 - (t - 0.6) / 0.4 * 0.25;
+    const s = this.target * bounce;
+    if (s <= 0.5) return;
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, Math.min(1, this.life * 2));
+    ctx.translate(this.x, this.y); ctx.rotate(this.rot + Math.sin(this.wob) * 0.12);
+    // White outline (sticker look)
+    ctx.fillStyle = '#ffffff'; ctx.shadowColor = 'rgba(255,60,110,.6)'; ctx.shadowBlur = 10;
+    drawHeartPath(s * 1.18); ctx.fill();
+    ctx.shadowBlur = 0;
+    const g = ctx.createLinearGradient(0, -s, 0, s * 0.4);
+    g.addColorStop(0, this.hue[1]); g.addColorStop(1, this.hue[0]);
+    ctx.fillStyle = g; drawHeartPath(s); ctx.fill();
+    // Glossy highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.beginPath(); ctx.ellipse(-s * 0.38, -s * 0.5, s * 0.16, s * 0.09, -0.6, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+}
+
+// Four-point twinkle stars
+class Star {
+  constructor(x, y, scale) {
+    this.type = 'star';
+    const a = rand(0, Math.PI * 2), sp = rand(1, 3.5) * scale;
+    this.x = x; this.y = y; this.vx = Math.cos(a) * sp; this.vy = Math.sin(a) * sp - 0.5;
+    this.size = rand(4, 8) * scale; this.life = 1; this.decay = rand(0.025, 0.045); this.rot = rand(0, 1.5);
+    this.color = pick(['#ffffff', '#fff3a8', '#ffd1e6']);
+  }
+  update() { this.x += this.vx; this.y += this.vy; this.vx *= 0.92; this.vy *= 0.92; this.life -= this.decay; this.rot += 0.05; }
+  draw() {
+    const s = this.size * (0.6 + Math.sin(this.life * Math.PI) * 0.6);
+    ctx.save(); ctx.globalAlpha = Math.max(0, this.life);
+    ctx.translate(this.x, this.y); ctx.rotate(this.rot);
+    ctx.fillStyle = this.color; ctx.shadowColor = this.color; ctx.shadowBlur = 8;
+    ctx.beginPath();
+    for (let i = 0; i < 4; i++) {
+      ctx.rotate(Math.PI / 2);
+      ctx.moveTo(0, -s); ctx.quadraticCurveTo(s * 0.12, -s * 0.12, s * 0.25, 0); ctx.lineTo(0, 0);
+    }
+    ctx.fill();
+    ctx.beginPath(); ctx.arc(0, 0, s * 0.22, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+}
+
+function drawHeartPath(s) {
+  ctx.beginPath();
+  ctx.moveTo(0, s * 0.35);
+  ctx.bezierCurveTo(-s * 1.1, -s * 0.35, -s * 0.55, -s * 1.1, 0, -s * 0.5);
+  ctx.bezierCurveTo(s * 0.55, -s * 1.1, s * 1.1, -s * 0.35, 0, s * 0.35);
+  ctx.closePath();
+}
+
+function add(p) { if (particles.length < MAX_PARTICLES) particles.push(p); }
+
+/* ---------------- Hand geometry ---------------- */
+let vw = 1280, vh = 720;
+function toScreen(lm) {
+  const s = Math.max(W / vw, H / vh);
+  const dw = vw * s, dh = vh * s;
+  const ox = (W - dw) / 2, oy = (H - dh) / 2;
+  return { x: W - (ox + lm.x * dw), y: oy + lm.y * dh }; // mirrored
+}
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+
+const heartStreak = {}, peaceStreak = {};
+function analyzeHand(lms, wl, side) {
+  const p = lms.map(toScreen);
+  const wrist = p[0];
+  const handSize = dist(p[0], p[9]) || 1;
+  const ext = [];
+  // index, middle, ring, pinky
+  for (const [tip, pip] of [[8, 6], [12, 10], [16, 14], [20, 18]]) {
+    ext.push(dist(p[tip], wrist) > dist(p[pip], wrist) * 1.12);
+  }
+  const thumbExt = dist(p[4], p[17]) > dist(p[3], p[17]) * 1.05 && dist(p[4], p[5]) > handSize * 0.45;
+  const nExt = ext.filter(Boolean).length;
+  const palm = {
+    x: (p[0].x + p[5].x + p[9].x + p[13].x + p[17].x) / 5,
+    y: (p[0].y + p[5].y + p[9].y + p[13].y + p[17].y) / 5
+  };
+  let g = 'none';
+  // Use 3D world landmarks for finger curl: far more robust than 2D when the hand rotates
+  const w = wl && wl.length === 21 ? wl : null;
+  const d3 = (a, b) => w ? Math.hypot(w[a].x - w[b].x, w[a].y - w[b].y, w[a].z - w[b].z) : dist(p[a], p[b]);
+  const hs3 = d3(0, 9) || 1;
+  const r3 = (t, q) => d3(t, 0) / (d3(q, 0) || 1);
+  const ri = r3(8, 6), rm = r3(12, 10), rr = r3(16, 14), rp = r3(20, 18);
+  const ext3 = [ri > 1.12, rm > 1.12, rr > 1.12, rp > 1.12];
+  const n3 = ext3.filter(Boolean).length;
+  const thumbToIndex3 = Math.min(d3(4, 8), d3(4, 7), d3(4, 6)) / hs3;
+  const thumbToIndex2 = Math.min(dist(p[4], p[8]), dist(p[4], p[7]), dist(p[4], p[6])) / handSize;
+  const folded = ri < 1.1 && rm < 1.02 && rr < 1.02 && rp < 1.06;
+  if (n3 >= 4 || (nExt >= 4 && n3 >= 3)) g = 'open';
+  // 🫰 Finger heart vs ✊ fist (calibrated on real recordings):
+  // In a finger heart the index tip sticks out to pinch the thumb and the thumb tip is far from the index knuckle; in a fist the index tip tucks into the palm and the thumb wraps over the fingers
+  const heartScore = d3(8, 13) / hs3 + d3(4, 5) / hs3;
+  // Middle, ring and pinky folded, thumb pressed on the index; the index may be straight (one style) or bent with the heart features above (another style)
+  // With a straight index the thumb must touch its upper half (tip or DIP), otherwise an "L" shape gets mistaken for a heart
+  const thumbOnUpperIndex = Math.min(d3(4, 8), d3(4, 7)) / hs3;
+  const heartLike = rm < 1.25 && rr < 1.1 && rp < 1.14 && thumbToIndex3 < 0.5 &&
+    ((ri >= 1.0 && thumbOnUpperIndex < 0.4) || (ri < 1.0 && heartScore > 1.02));
+  // Require 2 consecutive heart-like detections (per hand) to filter one-frame false positives while closing the hand
+  heartStreak[side] = heartLike ? (heartStreak[side] || 0) + 1 : 0;
+  if (heartLike && heartStreak[side] >= 2) g = 'fingerheart';
+  else if (folded && !heartLike) g = 'fist';
+  // ✌️ Peace sign: index and middle extended and apart, ring and pinky folded → collect flowers
+  const peaceLike = !heartLike && ext3[0] && ext3[1] && !ext3[2] && !ext3[3] && dist(p[8], p[12]) > handSize * 0.3;
+  peaceStreak[side] = peaceLike ? (peaceStreak[side] || 0) + 1 : 0;
+  if (peaceLike && peaceStreak[side] >= 3) g = 'peace'; // require 3 in a row so closing the hand does not trigger it
+  // Index only → writing (thumb must not pinch the index)
+  if (!heartLike && ext3[0] && !ext3[1] && !ext3[2] && !ext3[3] && thumbToIndex3 > 0.45) g = 'point';
+  const indexOnly = ext3[0] && !ext3[1] && !ext3[2] && !ext3[3]; // index only (thumb anywhere) → used for writing in fog mode
+  return { p, palm, handSize, gesture: g, thumbExt, nExt, side, heartScore, indexOnly };
+}
+
+/* ---------------- Gesture smoothing ---------------- */
+let rawLabel = 'none', stableLabel = 'none', sameCount = 0;
+const LABELS = {
+  none: 'No hands detected', idle: 'Hand detected · try opening your palm',
+  open: '🖐 Blooming', fist: '✊ Fist', peace: '✌️ Collecting flowers', fingerheart: '🫰 Finger heart',
+  heart: '🫶 Two-hand heart', letter: '💌 Fingertip letter',
+  fogidle: '🌫 Open your mouth and breathe "haaa" at the camera', breath: '🌬 Fogging…', draw: '☝️ Writing', wipe: '🖐 Wiping the fog',
+  fogload: '🌫 Loading face model…', noface: '🙂 Can\'t see your face, please face the camera', faceerr: '⚠️ Face model failed to load, please refresh'
+};
+function commit(label) {
+  if (label === rawLabel) sameCount++; else { rawLabel = label; sameCount = 0; }
+  if (sameCount >= 3 && stableLabel !== label) {
+    stableLabel = label;
+    gestureText.textContent = LABELS[label] || label;
+    if (label === 'heart') heartBurst = 1;
+  }
+}
+
+/* ---------------- Main loop ---------------- */
+let landmarker = null, lastVideoTime = -1, hands = [];
+let heartBurst = 0, heartCenter = null, fhMem = {};
+
+/* ---------------- Breath fog ---------------- */
+let fileset = null;
+let faceLandmarker = null, faceLoading = false, faceFrame = 0;
+let mouth = null, faceScale = 1, mouthOpen = 0, breathing = false;
+let breathT = 0, lastBreathAt = 0, fadeTick = 0, lastT = performance.now();
+let spaceHeld = false, openSince = 0, pen = null, coverFrames = 0, coveredThisBreath = false, penLostAt = 0; const drips = [];
+
+async function loadFace(fileset, only) {
+  if (faceLandmarker || faceLoading) return;
+  faceLoading = true;
+  const opts = (delegate) => ({
+    baseOptions: {
+      modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
+      delegate
+    },
+    runningMode: 'VIDEO', numFaces: 1, outputFaceBlendshapes: true
+  });
+  // Run the face model on CPU, separate from the hand model on GPU, so detection does not flicker
+  if (only === 'GPU') {
+    try { faceLandmarker = await FaceLandmarker.createFromOptions(fileset, opts('GPU')); faceDelegate = 'GPU'; } catch (e) { console.warn(e); }
+  }
+  if (!faceLandmarker) {
+    try { faceLandmarker = await FaceLandmarker.createFromOptions(fileset, opts('CPU')); faceDelegate = 'CPU'; }
+    catch (e2) { console.error(e2); faceFailed = true; }
+  }
+  faceLoading = false;
+}
+
+let lastFaceAt = 0, mouthBase = 0.06, faceErrors = 0, faceFailed = false, faceDelegate = 'CPU';
+function detectFace() {
+  if (!faceLandmarker || video.readyState < 2) return;
+  let res;
+  try { res = faceLandmarker.detectForVideo(video, performance.now()); faceErrors = 0; }
+  catch (e) {
+    console.warn('face detect error', e);
+    if (++faceErrors > 8 && faceDelegate === 'GPU') { // fall back to CPU if the GPU keeps failing
+      try { faceLandmarker.close(); } catch (_) {}
+      faceLandmarker = null; faceDelegate = 'CPU'; faceErrors = 0; loadFace(fileset, 'CPU');
+    }
+    return;
+  }
+  const lm = res.faceLandmarks && res.faceLandmarks[0];
+  if (!lm) { if (performance.now() - lastFaceAt > 500) { mouth = null; mouthOpen = 0; } return; }
+  lastFaceAt = performance.now();
+  const up = toScreen(lm[13]), lo = toScreen(lm[14]);
+  mouth = { x: (up.x + lo.x) / 2, y: (up.y + lo.y) / 2 };
+  faceScale = Math.max(0.5, Math.min(2.5, dist(toScreen(lm[234]), toScreen(lm[454])) / 220));
+  // Geometry: lip gap ÷ mouth width, auto-calibrated to your closed-mouth baseline
+  const ratio = dist(up, lo) / (dist(toScreen(lm[61]), toScreen(lm[291])) || 1);
+  if (ratio < mouthBase) mouthBase = mouthBase * 0.7 + ratio * 0.3;
+  else if (ratio < mouthBase + 0.08) mouthBase += (ratio - mouthBase) * 0.01;
+  const geo = Math.max(0, Math.min(1, (ratio - mouthBase) / 0.32));
+  const bs = res.faceBlendshapes && res.faceBlendshapes[0] ? res.faceBlendshapes[0].categories : [];
+  const get = n => { const c = bs.find(c => c.categoryName === n); return c ? c.score : 0; };
+  // Only count a dropped jaw ("haaa") or rounded lips ("hooo"); damp it while smiling so a smile does not fog the glass
+  const smile = (get('mouthSmileLeft') + get('mouthSmileRight')) / 2;
+  let target = Math.max(get('jawOpen') / 0.45, (get('mouthFunnel') - 0.25) / 0.45);
+  if (smile > 0.35) target *= 0.5;
+  mouthOpen = mouthOpen * 0.5 + Math.max(0, Math.min(1, target)) * 0.5;
+}
+
+function updateFog(dt) {
+  const fw = fogMask.width, fh = fogMask.height;
+  const now = performance.now();
+  // Open mouth or rounded lips counts as breathing; hysteresis prevents flicker
+  const wasBreathing = breathing;
+  // Mouth must stay open for 0.25 s, so talking or quick expressions do not count
+  if (mouth && mouthOpen > 0.6) { if (!openSince) openSince = now; } else if (!mouth || mouthOpen < 0.35) openSince = 0;
+  breathing = !!mouth && (breathing ? mouthOpen > 0.35 : (openSince && now - openSince > 250));
+  breathing = !!breathing || spaceHeld; // holding the space bar also counts as breathing
+  if (!breathing && now - lastBreathAt > 600) coveredThisBreath = false;
+  if (breathing && !coveredThisBreath) { coverFrames = 14; coveredThisBreath = true; } // a new breath fogs over all old writing
+  if (coverFrames > 0) {
+    coverFrames--;
+    smx.save(); smx.globalCompositeOperation = 'destination-out';
+    smx.fillStyle = coverFrames === 0 ? 'rgba(0,0,0,1)' : 'rgba(0,0,0,0.18)';
+    smx.fillRect(0, 0, fw, fh); smx.restore();
+    drips.length = coverFrames === 0 ? 0 : drips.length;
+  }
+
+  if (breathing) {
+    lastBreathAt = now;
+    breathT += dt / 1000;
+    const R = Math.min(Math.max(fw, fh) * 0.6, (50 + breathT * 260) * faceScale) * FS;
+    const mo = mouth || { x: W / 2, y: H * 0.55 };
+    const mx = mo.x * FS, my = mo.y * FS;
+    fmx.save(); fmx.globalCompositeOperation = 'source-over';
+    for (let i = 0; i < 6; i++) {
+      const a = Math.random() * Math.PI * 2, d = Math.random() * R * 0.75;
+      const x = mx + Math.cos(a) * d, y = my + Math.sin(a) * d * 0.8;
+      const r = R * rand(0.25, 0.6);
+      const g = fmx.createRadialGradient(x, y, 0, x, y, r);
+      g.addColorStop(0, 'rgba(255,255,255,0.16)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+      fmx.fillStyle = g; fmx.beginPath(); fmx.arc(x, y, r, 0, Math.PI * 2); fmx.fill();
+    }
+    fmx.restore();
+  } else {
+    breathT = Math.max(0, breathT - dt / 400);
+  }
+
+  // Fog does not evaporate: writing stays until the next breath
+
+  // Finger writing / palm wiping
+  // Pen down: index-only gesture; keep drawing while the index stays extended; lift the pen after 0.15 s without it
+  let tip = null, sc = 1, best = Infinity;
+  for (const h of hands) {
+    const r = dist(h.p[8], h.p[0]) / (dist(h.p[6], h.p[0]) || 1);
+    const midR = dist(h.p[12], h.p[0]) / (dist(h.p[10], h.p[0]) || 1);
+    const ok = h.gesture === 'point' || h.indexOnly || (pen && r > 1.02 && midR < 1.1);
+    if (!ok) continue;
+    const d = pen ? dist(pen, h.p[8]) : 0;
+    if (d < best) { best = d; tip = h.p[8]; sc = Math.max(0.6, Math.min(1.8, h.handSize / 110)); }
+  }
+  smx.save(); smx.globalCompositeOperation = 'source-over';
+  smx.lineCap = 'round'; smx.lineJoin = 'round';
+  if (tip) {
+    penLostAt = now;
+    const cur = pen ? { x: pen.x + (tip.x - pen.x) * 0.8, y: pen.y + (tip.y - pen.y) * 0.8 } : { x: tip.x, y: tip.y };
+    smx.strokeStyle = 'rgba(0,0,0,1)'; smx.lineWidth = 24 * sc * FS;
+    smx.beginPath();
+    if (pen && dist(pen, cur) < 400) { smx.moveTo(pen.x * FS, pen.y * FS); smx.lineTo(cur.x * FS, cur.y * FS); }
+    else { smx.moveTo(cur.x * FS, cur.y * FS); smx.lineTo(cur.x * FS + 0.1, cur.y * FS); }
+    smx.stroke();
+    if (Math.random() < 0.03 && drips.length < 40) drips.push({ x: cur.x + rand(-6, 6), y: cur.y + 8 * sc, vy: rand(0.5, 1.3), life: rand(70, 180), r: rand(3, 5) * sc });
+    pen = cur;
+  } else if (pen && now - penLostAt > 150) pen = null;
+  smx.restore();
+  fmx.save(); fmx.globalCompositeOperation = 'destination-out';
+  for (const h of hands) {
+    if (h.gesture === 'open') {
+      const g = fmx.createRadialGradient(h.palm.x * FS, h.palm.y * FS, 0, h.palm.x * FS, h.palm.y * FS, h.handSize * 1.1 * FS);
+      g.addColorStop(0, 'rgba(0,0,0,0.5)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+      fmx.fillStyle = g; fmx.beginPath(); fmx.arc(h.palm.x * FS, h.palm.y * FS, h.handSize * 1.1 * FS, 0, Math.PI * 2); fmx.fill();
+    }
+  }
+  // Droplets run down and leave thin clear trails
+  for (const d of drips) {
+    d.y += d.vy; d.vy = Math.min(2.2, d.vy + rand(-0.05, 0.08)); d.x += rand(-0.3, 0.3); d.life--;
+    smx.fillStyle = 'rgba(0,0,0,1)'; smx.beginPath(); smx.arc(d.x * FS, d.y * FS, d.r * FS, 0, Math.PI * 2); smx.fill();
+  }
+  for (let i = drips.length - 1; i >= 0; i--) if (drips[i].life <= 0 || drips[i].y > H) drips.splice(i, 1);
+  fmx.restore();
+}
+
+function renderFog() {
+  const fw = fogLayer.width, fh = fogLayer.height;
+  flx.save();
+  flx.globalCompositeOperation = 'source-over';
+  flx.clearRect(0, 0, fw, fh);
+  // What you see through the fog: blurred and brightened
+  const s = Math.max(fw / vw, fh / vh), dw = vw * s, dh = vh * s;
+  flx.filter = 'blur(5px) brightness(1.12) saturate(0.8)';
+  flx.translate(fw, 0); flx.scale(-1, 1);
+  flx.drawImage(video, (fw - dw) / 2, (fh - dh) / 2, dw, dh);
+  flx.setTransform(1, 0, 0, 1, 0, 0);
+  flx.filter = 'none';
+  flx.fillStyle = 'rgba(228,234,242,0.55)'; flx.fillRect(0, 0, fw, fh);
+  flx.drawImage(speckle, 0, 0);
+  flx.globalCompositeOperation = 'destination-in';
+  flx.drawImage(fogMask, 0, 0);
+  flx.globalCompositeOperation = 'destination-out';
+  flx.drawImage(strokeMask, 0, 0);
+  flx.restore();
+  ctx.drawImage(fogLayer, 0, 0, W, H);
+  // Droplet highlights
+  ctx.save();
+  for (const d of drips) {
+    ctx.globalAlpha = Math.min(1, d.life / 40) * 0.8;
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.beginPath(); ctx.ellipse(d.x, d.y, d.r * 0.7, d.r, 0, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function frame() {
+  requestAnimationFrame(frame);
+  if (video.readyState >= 2) {
+    vw = video.videoWidth || vw; vh = video.videoHeight || vh;
+    if (landmarker && video.currentTime !== lastVideoTime) {
+      lastVideoTime = video.currentTime;
+      try {
+        const res = landmarker.detectForVideo(video, performance.now());
+        const hd = res.handedness || res.handednesses || [];
+        hands = (res.landmarks || []).map((lm, i) => analyzeHand(lm, res.worldLandmarks && res.worldLandmarks[i], hd[i] && hd[i][0] ? hd[i][0].categoryName : 'H' + i));
+      } catch (e) { /* skip frame */ }
+      if (mode === 'fog') detectFace();
+    }
+  }
+
+  // draw mirrored video (cover)
+  ctx.clearRect(0, 0, W, H);
+  if (video.readyState >= 2) {
+    const s = Math.max(W / vw, H / vh), dw = vw * s, dh = vh * s;
+    ctx.save(); ctx.translate(W, 0); ctx.scale(-1, 1);
+    ctx.drawImage(video, (W - dw) / 2, (H - dh) / 2, dw, dh);
+    ctx.restore();
+    // soft dreamy tint
+    const vg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.max(W, H) * 0.75);
+    vg.addColorStop(0, 'rgba(255,200,230,0)'); vg.addColorStop(1, 'rgba(60,20,60,0.35)');
+    ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
+  }
+
+  const nowT = performance.now(), dt = Math.min(100, nowT - lastT); lastT = nowT;
+  if (mode === 'fog') {
+    if (!faceLandmarker && !faceLoading && !faceFailed && fileset) loadFace(fileset);
+    updateFog(dt);
+    if (video.readyState >= 2) renderFog();
+  }
+
+  dot.classList.toggle('on', hands.length > 0);
+  meterEl.classList.toggle('show', mode === 'fog' && !!faceLandmarker);
+  if (mode === 'fog') { meterFill.style.width = Math.round(mouthOpen * 100) + '%'; meterFill.style.background = breathing ? '#ffffff' : ''; }
+
+  // gestures
+  let label = hands.length ? 'idle' : 'none';
+  let twoHandHeart = false;
+  if (hands.length === 2) {
+    const [a, b] = hands;
+    const hs = (a.handSize + b.handSize) / 2;
+    const indexClose = dist(a.p[8], b.p[8]) < hs * 0.45;
+    const thumbClose = dist(a.p[4], b.p[4]) < hs * 0.55;
+    const thumbsBelow = (a.p[4].y + b.p[4].y) / 2 > (a.p[8].y + b.p[8].y) / 2;
+    if (indexClose && thumbClose && thumbsBelow) {
+      twoHandHeart = true;
+      heartCenter = {
+        x: (a.p[8].x + b.p[8].x + a.p[4].x + b.p[4].x) / 4,
+        y: (a.p[8].y + b.p[8].y + a.p[4].y + b.p[4].y) / 4,
+        s: hs / 110
+      };
+    }
+  }
+
+  if (twoHandHeart) {
+    label = 'heart';
+    const c = heartCenter;
+    for (let i = 0; i < 3; i++) add(new Heart(c.x, c.y, Math.max(0.7, c.s), true));
+    if (heartBurst > 0) { for (let i = 0; i < 40; i++) add(new Heart(c.x, c.y, Math.max(0.7, c.s), true)); heartBurst = 0; }
+  } else {
+    let any = { open: false, fist: false, fingerheart: false };
+    for (const h of hands) {
+      const sc = Math.max(0.6, Math.min(1.8, h.handSize / 110));
+      if (mode === 'flower') {
+        if (h.gesture === 'open') {
+          any.open = true;
+          if (Math.random() < 0.55) add(new Flower(h.palm.x, h.palm.y, sc));
+          if (Math.random() < 0.9) add(new Petal(h.palm.x, h.palm.y, sc));
+          if (Math.random() < 0.045) add(new Butterfly(h.palm.x, h.palm.y, sc));
+          if (Math.random() < 0.6) add(new Sparkle(h.palm.x + rand(-30, 30) * sc, h.palm.y + rand(-30, 30) * sc));
+        }
+      }
+      // Keep the finger-heart state for 0.3 s, tracked separately for each hand
+      const nowFH = performance.now();
+      const mem = fhMem[h.side];
+      if (h.gesture === 'fingerheart') fhMem[h.side] = { x: h.palm.x, y: h.palm.y, t: nowFH, started: mem && nowFH - mem.t < 300 ? mem.started : nowFH, burst: mem && nowFH - mem.t < 300 ? mem.burst : false };
+      else if (mem && nowFH - mem.t < 300 && h.gesture !== 'open' && h.gesture !== 'point' && h.gesture !== 'peace' && !(h.gesture === 'fist' && h.heartScore < 0.92) && dist(mem, h.palm) < h.handSize) h.gesture = 'fingerheart';
+      if (h.gesture === 'fingerheart' && mode === 'flower') { // single-hand heart effect only in flower mode
+        const m2 = fhMem[h.side];
+        const tipC = { x: (h.p[4].x + h.p[8].x) / 2, y: (h.p[4].y + h.p[8].y) / 2 };
+        if (!m2.burst) { m2.burst = true; add(new PopHeart(tipC.x, tipC.y, sc * 1.6, true)); for (let i = 0; i < 6; i++) add(new Star(tipC.x, tipC.y, sc)); }
+        any.fingerheart = true;
+        const tip = { x: (h.p[4].x + h.p[8].x) / 2, y: (h.p[4].y + h.p[8].y) / 2 };
+        if (Math.random() < 0.12) add(new PopHeart(tip.x, tip.y, sc, false));
+        if (Math.random() < 0.25) add(new Star(tip.x, tip.y, sc));
+      }
+      if (h.gesture === 'peace') {
+        any.fist = true;
+        for (const pt of particles) {
+          if (pt.type === 'heart' || pt.type === 'pop' || pt.type === 'star') continue;
+          const dx = h.palm.x - pt.x, dy = h.palm.y - pt.y, d = Math.hypot(dx, dy);
+          if (d < 420 * sc) {
+            pt.vx += dx / d * 0.9; pt.vy += dy / d * 0.9;
+            pt.vx *= 0.9; pt.vy *= 0.9;
+            if (d < 40 * sc) pt.life -= 0.08;
+          }
+        }
+      }
+    }
+    if (mode === 'letter' && hands.length) label = 'letter';
+    if (any.fingerheart) label = 'fingerheart';
+    else if (any.fist) label = 'peace';
+    else if (any.open && mode === 'flower') label = 'open';
+    if (mode === 'fog') {
+      label = breathing ? 'breath' : faceFailed ? 'faceerr' : !faceLandmarker ? 'fogload' : !mouth ? 'noface' : pen ? 'draw' : hands.some(h => h.gesture === 'open') ? 'wipe' : 'fogidle';
+    }
+
+  }
+  commit(label);
+
+  // update & draw particles
+  for (const pt of particles) pt.update();
+  particles = particles.filter(pt => pt.life > 0 && pt.x > -100 && pt.x < W + 100 && pt.y > -150 && pt.y < H + 150);
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (const pt of particles) if (pt.type === 'sparkle') pt.draw();
+  ctx.restore();
+  for (const pt of particles) if (pt.type !== 'sparkle' && pt.type !== 'pop' && pt.type !== 'star') pt.draw();
+  for (const pt of particles) if (pt.type === 'pop' || pt.type === 'star') pt.draw(); // draw heart effects on top
+
+  // letter mode overlays
+  if (mode === 'letter' && hands.length) drawLetters();
+  if (twoHandHeart) drawToText();
+}
+
+// Each word is pinned to one finger (no per-frame re-sorting), with smoothed position and fades
+const slots = []; // {x,y,s,alpha,ext}
+const FINGERS = [[4, 3], [8, 6], [12, 10], [16, 14], [20, 18]];
+function drawLetters() {
+  const raw = (msgInput.value || '').trim();
+  // With spaces → one word per finger; without spaces → one character per finger
+  const words = /\s/.test(raw) ? raw.split(/\s+/).filter(Boolean).slice(0, 10) : Array.from(raw).slice(0, 10);
+  // Hands ordered left to right by wrist position; fingers ordered thumb first
+  const hs = [...hands].sort((a, b) => a.p[0].x - b.p[0].x);
+  const targets = [];
+  for (const h of hs) {
+    const order = [0, 1, 2, 3, 4]; // both hands start from the thumb: thumb → first word
+    for (const k of order) {
+      const [tip, pip] = FINGERS[k];
+      const r = k === 0 ? dist(h.p[4], h.p[17]) / (dist(h.p[3], h.p[17]) || 1)
+                        : dist(h.p[tip], h.p[0]) / (dist(h.p[pip], h.p[0]) || 1);
+      targets.push({ x: h.p[tip].x, y: h.p[tip].y, s: h.handSize, r, thumb: k === 0 });
+    }
+  }
+  const t = performance.now() / 1000;
+  for (let i = 0; i < Math.max(targets.length, slots.length); i++) {
+    const tg = targets[i];
+    if (!slots[i]) slots[i] = { x: tg ? tg.x : 0, y: tg ? tg.y : 0, s: tg ? tg.s : 100, alpha: 0, ext: false };
+    const sl = slots[i];
+    if (tg) {
+      // Smooth the position to reduce jitter
+      const k = dist(sl, tg) > 120 ? 1 : 0.45;
+      sl.x += (tg.x - sl.x) * k; sl.y += (tg.y - sl.y) * k; sl.s += (tg.s - sl.s) * 0.3;
+      // Hysteresis: switch only on a clear extend or fold
+      const onT = tg.thumb ? 1.08 : 1.12, offT = tg.thumb ? 0.98 : 1.0;
+      sl.ext = sl.ext ? tg.r > offT : tg.r > onT;
+    } else sl.ext = false;
+    sl.alpha += ((sl.ext ? 1 : 0) - sl.alpha) * 0.25;
+    if (i >= words.length || sl.alpha < 0.03) continue;
+    const word = words[i];
+    const base = Math.max(16, Math.min(40, sl.s * 0.26));
+    const fs = word.length > 3 ? base * 0.72 : base; // shrink long words a little
+    const y = sl.y - fs * 1.0 + Math.sin(t * 2 + i) * 1.5;
+    if (sl.ext && Math.random() < 0.2) add(new Sparkle(sl.x, sl.y));
+    ctx.save();
+    ctx.globalAlpha = sl.alpha;
+    ctx.font = `600 ${fs}px "PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const tw = ctx.measureText(word).width;
+    ctx.fillStyle = 'rgba(255,255,255,0.88)';
+    ctx.shadowColor = 'rgba(255,120,180,0.9)'; ctx.shadowBlur = 16;
+    roundRect(sl.x - tw / 2 - fs * 0.35, y - fs * 0.62, tw + fs * 0.7, fs * 1.24, fs * 0.5); ctx.fill();
+    ctx.shadowBlur = 0; ctx.fillStyle = '#ff4f95';
+    ctx.fillText(word, sl.x, y + 1);
+    ctx.restore();
+  }
+  if (targets.length < slots.length && slots.every((s, i) => i < targets.length || s.alpha < 0.03)) slots.length = targets.length;
+}
+
+function drawToText() {
+  const txt = toInput.value || '';
+  if (!txt || !heartCenter) return;
+  const fs = Math.max(28, Math.min(64, heartCenter.s * 46));
+  ctx.save();
+  ctx.font = `italic 600 ${fs}px Georgia, "Times New Roman", serif`;
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#fff'; ctx.shadowColor = '#ff4f95'; ctx.shadowBlur = 24;
+  ctx.fillText(txt, heartCenter.x, heartCenter.y - heartCenter.s * 150);
+  ctx.restore();
+}
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+
+/* ---------------- Start ---------------- */
+const startBtn = document.getElementById('startBtn');
+const errBox = document.getElementById('err');
+startBtn.onclick = async () => {
+  startBtn.disabled = true; startBtn.textContent = 'Loading…';
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' }, audio: false });
+    video.srcObject = stream; await video.play();
+    document.getElementById('start').style.display = 'none';
+    gestureText.textContent = 'Loading hand model…';
+    requestAnimationFrame(frame);
+    fileset = await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm');
+    const opts = (delegate) => ({
+      baseOptions: {
+        modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
+        delegate
+      },
+      runningMode: 'VIDEO', numHands: 2,
+      minHandDetectionConfidence: 0.6, minHandPresenceConfidence: 0.6, minTrackingConfidence: 0.5
+    });
+    try { landmarker = await HandLandmarker.createFromOptions(fileset, opts('GPU')); }
+    catch (e) { landmarker = await HandLandmarker.createFromOptions(fileset, opts('CPU')); }
+    gestureText.textContent = LABELS.none;
+  } catch (e) {
+    console.error(e);
+    document.getElementById('start').style.display = 'flex';
+    startBtn.disabled = false; startBtn.textContent = 'Try again';
+    errBox.textContent = 'Could not open the camera or load the models. Please allow camera access, check your internet connection, and use Chrome or Safari. (' + (e.message || e) + ')';
+  }
+};
+</script>
+</body>
+</html>

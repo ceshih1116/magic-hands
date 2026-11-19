@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Magic Hands · Gesture Effects &amp; Dance</title>
+<meta name="description" content="Turn on your camera and play with hand-gesture effects: blooming flowers, finger hearts, writing on a fogged window, and a gesture-dance scoring game.">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { min-height: 100vh; color: #fff; background: radial-gradient(ellipse at top, #4a2152 0%, #1a0e20 60%, #120a16 100%);
+    font-family: -apple-system, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+    display: flex; flex-direction: column; align-items: center; padding: 48px 20px 40px; }
+  h1 { font-size: clamp(32px, 7vw, 52px); letter-spacing: 2px; text-align: center; }
+  h1 span { background: linear-gradient(135deg, #ffd1e6, #ff6fae, #b98bff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .lead { margin-top: 12px; opacity: .75; text-align: center; line-height: 1.8; max-width: 560px; }
+  .grid { margin-top: 36px; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; width: min(880px, 100%); }
+  a.card { display: block; text-decoration: none; color: #fff; padding: 26px 24px 22px; border-radius: 22px;
+    background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.14); transition: transform .2s, background .2s; }
+  a.card:hover { transform: translateY(-4px); background: rgba(255,255,255,.1); }
+  .emoji { font-size: 40px; }
+  .card h2 { font-size: 22px; margin: 10px 0 8px; }
+  .card p { opacity: .75; font-size: 14px; line-height: 1.8; }
+  .go { display: inline-block; margin-top: 16px; padding: 10px 20px; border-radius: 999px; font-size: 15px;
+    background: linear-gradient(135deg, #ff8ac2, #b98bff); }
+  .tips { margin-top: 34px; width: min(880px, 100%); padding: 18px 22px; border-radius: 18px; background: rgba(255,255,255,.05);
+    border: 1px solid rgba(255,255,255,.1); font-size: 14px; line-height: 1.9; opacity: .85; }
+  .tips b { color: #ffc2de; }
+  footer { margin-top: 28px; font-size: 12px; opacity: .5; text-align: center; line-height: 1.8; }
+</style>
+</head>
+<body>
+  <h1>✿ <span>Magic Hands</span> ✿</h1>
+  <p class="lead">Turn on your camera and play with effects using just your hands. Everything runs live in your browser, and your camera feed is never uploaded anywhere.</p>
+
+  <div class="grid">
+    <a class="card" href="magic-hands.html">
+      <div class="emoji">🌸</div>
+      <h2>Gesture Effects</h2>
+      <p>🖐 Open palm: flowers bloom, butterflies fly out<br>✌️ Peace sign: collect the flowers<br>🫰 Finger heart: sticker hearts pop out<br>🫶 Two-hand heart: a burst of hearts<br>💌 Fingertip love letter · 🌫 Breathe on the glass and write in the fog</p>
+      <span class="go">Play →</span>
+    </a>
+    <a class="card" href="gesture-dance.html">
+      <div class="emoji">💃</div>
+      <h2>Gesture Dance</h2>
+      <p>Load a gesture-dance tutorial video and dance along like a mirror.<br>Every beat is rated Perfect / Good / Miss live,<br>you get a grade at the end, and you can record and share it.</p>
+      <span class="go">Dance →</span>
+    </a>
+  </div>
+
+  <div class="tips">
+    <b>How to open:</b> on a phone use <b>Safari</b> or <b>Chrome</b>; on a computer use <b>Chrome</b>. If you tapped the link inside LINE or Instagram, choose "Open in browser", or the camera may not work.<br>
+    <b>First time:</b> tap "Allow" when asked for camera access. The models take a few seconds to download.<br>
+    <b>For better tracking:</b> use good lighting, keep your hands and upper body in frame, and hold each gesture for a moment.
+  </div>
+
+  <footer>Built with MediaPipe · vibe-coded with Claude<br>Gesture-dance tutorial videos are loaded by you; videos and choreography belong to their original creators.</footer>
+</body>
+</html>
