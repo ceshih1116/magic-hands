@@ -100,9 +100,10 @@
 </div>
 
 <script type="module">
-import { FilesetResolver, HandLandmarker, FaceLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs";
+import { FilesetResolver, HandLandmarker, FaceLandmarker, PoseLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs";
 const WASM = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm";
 const HAND_MODEL = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
+const POSE_MODEL = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
 const FACE_MODEL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
 
 const $ = id => document.getElementById(id);
@@ -202,6 +203,19 @@ function drawParts() {
 }
 
 /* ---------- Hands ---------- */
+// follow each hand from frame to frame, so a gesture only counts once it has been held for a moment (no more one-frame flukes)
+function trackHands(now) {
+  for (const h of hands) {
+    let best = null, bd = 1e9;
+    for (const q of prevHands) { const d = dist(q.p[0], h.p[0]); if (d < bd && d < h.size * 1.3) { bd = d; best = q; } }
+    const dt = best ? Math.max(1, now - best.t) / 1000 : 1;
+    h.t = now; h.vel = best ? dist(best.c || best.p[0], h.c) / dt / h.size : 0;          // palm speed, in hand-sizes per second
+    h.openSince = h.open ? (best && best.openSince ? best.openSince : now) : 0;
+    h.pointSince = h.point ? (best && best.pointSince ? best.pointSince : now) : 0;
+  }
+  prevHands = hands;
+}
+const poseFresh = now => pose && now - pose.t < 300;
 function analyzeHand(lms, wl, side) {
   const p = lms.map(toScreen);
   const w = wl && wl.length === 21 ? wl : null;
@@ -210,7 +224,8 @@ function analyzeHand(lms, wl, side) {
   const ext = [r(8, 6) > 1.12, r(12, 10) > 1.12, r(16, 14) > 1.12, r(20, 18) > 1.12];
   const thumbAway = Math.min(d3(4, 8), d3(4, 7)) / hs3 > 0.45 && d3(4, 5) / hs3 > 0.35;   // thumb sticks out, away from the upper index (calibrated on a real recording)
   const n = ext.filter(Boolean).length;
-  const pinch = d3(4, 8) / hs3 < 0.38;                            // thumb and index tips touching (👌)
+  // thumb and index tips touching (👌): on a real recording the gap was 0.37–0.58 for OK and 0.8+ for an open palm, with the index bent (≤1.3)
+  const pinch = d3(4, 8) / hs3 < 0.62 && r(8, 6) < 1.3;
   const open = n >= 4 && !pinch;                                  // an OK sign is not an open palm
   const peace = ext[0] && ext[1] && !ext[2] && !ext[3] && dist(p[8], p[12]) > dist(p[0], p[9]) * 0.3;
   // "L" for the frame: index out, thumb out, the other fingers may stay relaxed (half open) — the frame itself also needs the two index fingers to point opposite ways
@@ -223,8 +238,10 @@ function analyzeHand(lms, wl, side) {
   const thumbsUp = thumbHigh && thumbProud && r(12, 10) < 1.05 && r(16, 14) < 1.05 && r(20, 18) < 1.1 && r(8, 6) < 1.3;
   const point = ext[0] && !ext[1] && !ext[2] && !ext[3] && !thumbHigh;   // ☝️ index finger only (a thumbs up is not a point)
   // 👌 OK: thumb and index tips touch, the other three fingers stay up
-  const ok = pinch && [ext[1], ext[2], ext[3]].filter(Boolean).length >= 2;   // the index bends into the ring, its tip may still look 'out'
-  return { p, open, peace, ell, point, side, size: dist(p[0], p[9]), idxR: r(8, 6), thumbAway, thumbsUp, ok };
+  const ok = pinch && [r(12, 10), r(16, 14), r(20, 18)].filter(v => v > 1.2).length >= 2;   // the other three fingers stay up
+  const c = { x: (p[0].x + p[5].x + p[9].x + p[13].x + p[17].x) / 5, y: (p[0].y + p[5].y + p[9].y + p[13].y + p[17].y) / 5 };
+  const curled = r(8, 6) < 0.95 && r(12, 10) < 0.95 && r(16, 14) < 0.95 && r(20, 18) < 0.98;
+  return { p, c, open, peace, ell, point, curled, side, size: dist(p[0], p[9]), idxR: r(8, 6), thumbAway, thumbsUp, ok };
 }
 
 /* ---------- 🫧 Photo bubbles on fingertips ---------- */
@@ -280,8 +297,9 @@ let palmOpenPrev = {}, nextFlyAt = 0;
 function updateButterflies(hands, now, dt) {
   const sorted = [...hands].sort((u, v) => u.p[0].x - v.p[0].x);
   const homes = new Map();     // butterfly slot → fingertip target
+  const clapping = now - lastClapAt < 1500 || (poseFresh(now) && dist(pose.w[0], pose.w[1]) < pose.sw * 0.7);
   sorted.forEach((h, hi) => {
-    if (!h.open) return;
+    if (!h.open || !h.openSince || now - h.openSince < 350 || h.vel > 3 || clapping || now - watch.seen < 500) return;   // a steady open palm, not a hand on its way to a clap
     const pc = { x: (h.p[0].x + h.p[9].x) / 2, y: (h.p[0].y + h.p[9].y) / 2 };
     [4, 8, 12, 16, 20].forEach((tip, fi) => {
       const t = h.p[tip], dx = t.x - pc.x, dy = t.y - pc.y, dl = Math.hypot(dx, dy) || 1;
@@ -358,7 +376,7 @@ function popEffect(b) {
 const lastTip = {};
 function updateFloaters(hands, now, dt) {
   const framing = frameAmt > 0.3;
-  const tips = hands.filter(h => h.point && !h.watchTap).map(h => ({ ...h.p[8], size: h.size, key: h.side }));
+  const tips = hands.filter(h => h.point && !h.watchTap && h.pointSince && now - h.pointSince > 200 && now - watch.seen > 500).map(h => ({ ...h.p[8], size: h.size, key: h.side }));
   if (!framing) for (const tp of tips) {
     const prev = lastTip[tp.key], moved = prev ? Math.hypot(tp.x - prev.x, tp.y - prev.y) : 0;
     if (!prev || now - prev.t > 260 || moved > tp.size * 0.5) {         // a new bubble every ~0.26 s, or sooner when the finger moves
@@ -542,11 +560,11 @@ function drawFrame(now) {
     const x = p.x + dx * s, y = p.y + dy * s; return { x: c.x + (x - c.x) * k, y: c.y + (y - c.y) * k }; });   // opens like an iris
   const ca = centroid(frame.a), cb = centroid(frame.b);
   const xs = q.map(p => p.x), ys = q.map(p => p.y), span = Math.max(160, Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)));
-  const ang = Math.atan2(cb.y - ca.y, cb.x - ca.x) * 0.35, sc = span * 1.15 / 1024;
+  const ang = Math.atan2(cb.y - ca.y, cb.x - ca.x) * 0.1, sc = Math.max(W, H) * 1.15 / 1024;
   ctx.save(); ctx.globalAlpha = clamp(frameAmt * 1.4, 0, 1);
   shapePath(q); ctx.save(); ctx.shadowColor = 'rgba(205,175,255,0.9)'; ctx.shadowBlur = 30; ctx.fillStyle = '#120c30'; ctx.fill(); ctx.restore();
   ctx.save(); shapePath(q); ctx.clip();
-  ctx.translate(c.x, c.y); ctx.rotate(ang); ctx.scale(sc, sc);
+  ctx.translate(W / 2, H / 2); ctx.rotate(ang); ctx.scale(sc, sc);   // a sky that stays put behind the glass
   ctx.drawImage(tex, -512 + Math.sin(t * 0.07) * 40, -512 + Math.cos(t * 0.05) * 30);
   ctx.globalCompositeOperation = 'lighter';
   for (const s of twinkles) {
@@ -583,8 +601,44 @@ function drawFrame(now) {
 /* ---------- ⌚ Tap your wrist like a watch → a holographic watch face on that wrist ---------- */
 const watch = { amt: 0, x: 0, y: 0, r: 0, ang: 0, seen: 0, lastTap: 0, near: false };
 const watchTaps = [];
+let watchHold = 0, armHold = 0;
 function markWatch(hands, now) {
   for (const h of hands) h.watchTap = false;
+  // with the body pose: an index finger resting on the other wrist (works even when the hand model only sees one hand)
+  if (poseFresh(now)) {
+    const P = pose;
+    for (const [a, b] of [[0, 1], [1, 0]]) {
+      const tip = P.ix[a], wr = P.w[b], el = P.el[b];
+      if (tip.v < 0.3 || wr.v < 0.3) continue;
+      const d = dist(tip, wr) / P.sw;
+      if (d < 0.3) {
+        watchHold += 1 / 30;
+        if (watchHold < 0.25) return;
+        const w = { x: wr.x + (wr.x - el.x) * -0.12, y: wr.y + (wr.y - el.y) * -0.12 };
+        if (watch.amt < 0.05) { watch.x = w.x; watch.y = w.y; watch.ang = Math.atan2(wr.y - el.y, wr.x - el.x) - Math.PI / 2; }
+        watch.x = lerp(watch.x, w.x, 0.35); watch.y = lerp(watch.y, w.y, 0.35); watch.r = P.sw * 0.13; watch.seen = now;
+        const near = d < 0.18;
+        if (near && !watch.near && now - watch.lastTap > 220) { watch.lastTap = now; watchTaps.push({ x: w.x, y: w.y, r: watch.r, born: now }); sparkle(w.x, w.y, 10, watch.r * 0.6); }
+        watch.near = near;
+        for (const h of hands) if (dist(h.p[8], tip) < h.size) h.watchTap = true;
+        return;
+      }
+    }
+    watchHold = 0;
+  }
+  // "it's time" with one arm across your chest: a loosely curled hand held sideways low in the picture (the tapping hand is often hidden behind it)
+  const arm = hands.find(h => h.curled && !h.thumbsUp && Math.abs(h.p[9].y - h.p[0].y) < Math.abs(h.p[9].x - h.p[0].x) * 0.8 && h.p[0].y > H * 0.5);
+  if (arm) {
+    armHold += 1 / 30;
+    if (armHold > 0.35) {
+      const fx = arm.p[0].x - arm.p[9].x, fy = arm.p[0].y - arm.p[9].y, w = { x: arm.p[0].x + fx * 0.3, y: arm.p[0].y + fy * 0.3 };
+      if (watch.amt < 0.05) { watch.x = w.x; watch.y = w.y; watch.ang = Math.atan2(fy, fx) - Math.PI / 2; }
+      watch.x = lerp(watch.x, w.x, 0.35); watch.y = lerp(watch.y, w.y, 0.35); watch.r = arm.size * 0.75; watch.seen = now;
+      if (now - watch.lastTap > 650) { watch.lastTap = now; watchTaps.push({ x: w.x, y: w.y, r: watch.r, born: now }); }      // a soft tick every beat
+      for (const h of hands) if (h !== arm && h.point) h.watchTap = true;
+      return;
+    }
+  } else armHold = 0;
   if (hands.length !== 2) return;
   for (const [A, B] of [[hands[0], hands[1]], [hands[1], hands[0]]]) {
     // the watch sits just past the wrist, on the forearm side
@@ -640,7 +694,7 @@ function drawWatch(now, dt) {
 /* ---------- 👍 👌 👏 Extra dance moves ---------- */
 // 👍 thumbs up → thin iridescent hearts float up from the thumb
 const hearts = [], okState = {}, waves = [];
-let thumbHold = {}, lastHeartAt = {}, clapPrev = { d: 9, t: 0, mid: null }, lastClapAt = 0, thumbPrev = {};
+let clapBurst = null, poseClapFar = 0, thumbHold = {}, lastHeartAt = {}, clapPrev = { d: 9, t: 0, mid: null }, lastClapAt = 0, thumbPrev = {};
 function updateExtras(hands, now, dt) {
   for (const h of hands) {
     const key = h.side + Math.round(h.p[0].x / 200);
@@ -658,20 +712,29 @@ function updateExtras(hands, now, dt) {
     if (h.ok) {
       const ring = [h.p[3], h.p[4], h.p[6], h.p[7], h.p[8]], c = centroid(ring), rr = ring.reduce((a, p) => a + dist(p, c), 0) / ring.length;
       if (o.amt < 0.05) { o.born = now; o.x = c.x; o.y = c.y; o.r = rr; sparkle(c.x, c.y, 16, rr); say('Alright ✓'); }
-      o.x = lerp(o.x, c.x, ease(dt, 18)); o.y = lerp(o.y, c.y, ease(dt, 18)); o.r = lerp(o.r, Math.max(rr, h.size * 0.18), ease(dt, 10));
+      o.x = lerp(o.x, c.x, ease(dt, 18)); o.y = lerp(o.y, c.y, ease(dt, 18)); o.r = lerp(o.r, Math.max(rr * 1.35, h.size * 0.3), ease(dt, 10));
       o.amt = lerp(o.amt, 1, ease(dt, 10)); o.seen = now;
     }
   }
   for (const k in okState) { const o = okState[k]; if (!o.seen || now - o.seen > 150) o.amt = lerp(o.amt, 0, ease(dt, 7)); }
+  // 👏 clap with the body pose: both wrists were apart a moment ago and are now together (hands may overlap and vanish from the hand model)
+  if (poseFresh(now) && pose.w[0].v > 0.3 && pose.w[1].v > 0.3) {
+    const wd = dist(pose.w[0], pose.w[1]) / pose.sw;
+    if (wd > 0.75) poseClapFar = now;
+    if (wd < 0.32 && poseClapFar && now - poseClapFar < 700 && now - lastClapAt > 400 && now - watch.seen > 400 && armHold === 0) {
+      const m = { x: (pose.ix[0].x + pose.ix[1].x + pose.w[0].x + pose.w[1].x) / 4, y: (pose.ix[0].y + pose.ix[1].y + pose.w[0].y + pose.w[1].y) / 4 };
+      clap(m, pose.sw * 0.45, now); poseClapFar = 0;
+    }
+  }
   // 👏 clap → the two palms come together fast (or one hand vanishes into the other)
   const palm = h => centroid([h.p[0], h.p[5], h.p[9], h.p[13], h.p[17]]);
   if (hands.length === 2) {
     const a = palm(hands[0]), b = palm(hands[1]), s = (hands[0].size + hands[1].size) / 2, d = dist(a, b) / s;
     const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-    if (d < 0.75 && clapPrev.far && now - clapPrev.far < 600 && now - lastClapAt > 350 && !hands.some(h => h.watchTap) && now - watch.seen > 400) clap(mid, s, now);
+    if (d < 0.75 && clapPrev.far && now - clapPrev.far < 600 && now - lastClapAt > 350 && !hands.some(h => h.watchTap) && now - watch.seen > 400 && armHold === 0) clap(mid, s, now);
     if (d > 1.4) clapPrev.far = now;
     clapPrev = { ...clapPrev, d, t: now, mid, s };
-  } else if (now - watch.seen > 400 && clapPrev.mid && now - clapPrev.t < 160 && clapPrev.d < 1.2 && clapPrev.far && now - clapPrev.far < 600 && now - lastClapAt > 350) {
+  } else if (now - watch.seen > 400 && armHold === 0 && clapPrev.mid && now - clapPrev.t < 160 && clapPrev.d < 1.2 && clapPrev.far && now - clapPrev.far < 600 && now - lastClapAt > 350) {
     clap(clapPrev.mid, clapPrev.s, now); clapPrev.mid = null;
   }
   // move hearts and ripples
@@ -682,8 +745,10 @@ function updateExtras(hands, now, dt) {
 }
 function clap(at, s, now) {
   lastClapAt = now; clapPrev.far = 0;
-  waves.push({ x: at.x, y: at.y, s, born: now }, { x: at.x, y: at.y, s: s * 0.6, born: now + 90 });
-  sparkle(at.x, at.y, 40, s * 0.6); confetti(at.x, at.y, 26, 0.7);
+  const S = Math.max(s, Math.min(W, H) * 0.16);
+  waves.push({ x: at.x, y: at.y, s: S, born: now }, { x: at.x, y: at.y, s: S * 0.7, born: now + 80 }, { x: at.x, y: at.y, s: S * 0.45, born: now + 160 });
+  clapBurst = { x: at.x, y: at.y, s: S, born: now, rot: rand(0, 6) };
+  sparkle(at.x, at.y, 70, S * 0.7); confetti(at.x, at.y, 44, 1);
   say('👏');
 }
 function heartPath(s) {   // a heart centred on (0,0), size s
@@ -725,12 +790,30 @@ function drawExtras(now) {
   }
   for (const w of waves) {
     const k = (now - w.born) / 900; if (k < 0) continue;
-    const e = 1 - Math.pow(1 - k, 3), r = w.s * (0.3 + 2.2 * e);
-    ctx.save(); ctx.globalAlpha = (1 - k) * 0.9; ctx.strokeStyle = '#fff4fb'; ctx.lineWidth = 2 * (1 - k) + 0.5; ctx.shadowColor = 'rgba(255,190,230,0.9)'; ctx.shadowBlur = 14;
+    const e = 1 - Math.pow(1 - k, 3), r = w.s * (0.3 + 3.2 * e);
+    ctx.save(); ctx.globalAlpha = (1 - k) * 0.95; ctx.strokeStyle = '#fff4fb'; ctx.lineWidth = 3.5 * (1 - k) + 0.6; ctx.shadowColor = 'rgba(255,190,230,0.9)'; ctx.shadowBlur = 14;
     ctx.beginPath(); ctx.ellipse(w.x, w.y, r, r * 0.92, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
   }
-  const fk = (now - lastClapAt) / 180;
-  if (fk >= 0 && fk < 1) { ctx.save(); ctx.fillStyle = `rgba(255,236,246,${0.1 * (1 - fk)})`; ctx.fillRect(0, 0, W, H); ctx.restore(); }
+  // 👏 a starburst of light rays from where your hands met
+  if (clapBurst) {
+    const k = (now - clapBurst.born) / 550;
+    if (k >= 1) clapBurst = null; else {
+      const { x, y, s: S } = clapBurst, e = 1 - Math.pow(1 - k, 2);
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < 18; i++) {
+        const a = clapBurst.rot + i / 18 * Math.PI * 2, r0 = S * (0.15 + 0.9 * e), r1 = r0 + S * (i % 2 ? 0.9 : 1.6) * (1 - k * 0.6);
+        const g = ctx.createLinearGradient(x + Math.cos(a) * r0, y + Math.sin(a) * r0, x + Math.cos(a) * r1, y + Math.sin(a) * r1);
+        g.addColorStop(0, `rgba(255,240,250,${0.9 * (1 - k)})`); g.addColorStop(1, 'rgba(255,200,235,0)');
+        ctx.strokeStyle = g; ctx.lineWidth = (i % 2 ? 1.2 : 2.4) * (1 - k) + 0.4;
+        ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * r0, y + Math.sin(a) * r0); ctx.lineTo(x + Math.cos(a) * r1, y + Math.sin(a) * r1); ctx.stroke();
+      }
+      const core = ctx.createRadialGradient(x, y, 0, x, y, S * 0.9); core.addColorStop(0, `rgba(255,248,252,${0.85 * (1 - k)})`); core.addColorStop(1, 'rgba(255,220,240,0)');
+      ctx.fillStyle = core; ctx.beginPath(); ctx.arc(x, y, S * 0.9, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+  }
+  const fk = (now - lastClapAt) / 220;
+  if (fk >= 0 && fk < 1) { ctx.save(); ctx.fillStyle = `rgba(255,236,246,${0.16 * (1 - fk)})`; ctx.fillRect(0, 0, W, H); ctx.restore(); }
 }
 
 /* ---------- ✌️✌️ 22 balloons + cake ---------- */
@@ -935,12 +1018,15 @@ function drawWish(t) {
 }
 
 /* ---------- MediaPipe ---------- */
-let fileset, handLM, faceLM, hands = [], frameN = 0, lastVT = -1;
+let fileset, handLM, faceLM, poseLM = null, pose = null, hands = [], prevHands = [], frameN = 0, lastVT = -1;
+const poseIn = document.createElement('canvas'), pix = poseIn.getContext('2d');
 async function loadModels() {
   fileset = await FilesetResolver.forVisionTasks(WASM);
   const hOpts = d => ({ baseOptions: { modelAssetPath: HAND_MODEL, delegate: d }, runningMode: 'VIDEO', numHands: 2, minHandDetectionConfidence: 0.5, minHandPresenceConfidence: 0.5, minTrackingConfidence: 0.5 });
   try { handLM = await HandLandmarker.createFromOptions(fileset, hOpts('GPU')); } catch (e) { handLM = await HandLandmarker.createFromOptions(fileset, hOpts('CPU')); }
   faceLM = await FaceLandmarker.createFromOptions(fileset, { baseOptions: { modelAssetPath: FACE_MODEL, delegate: 'CPU' }, runningMode: 'VIDEO', numFaces: 1, outputFaceBlendshapes: true });
+  // body pose: it still knows where both wrists are when your hands overlap (clapping, tapping your wrist), when the hand model loses one
+  try { poseLM = await PoseLandmarker.createFromOptions(fileset, { baseOptions: { modelAssetPath: POSE_MODEL, delegate: 'CPU' }, runningMode: 'VIDEO', numPoses: 1 }); } catch (e) { poseLM = null; }
 }
 function detect(now) {
   if (!handLM || video.readyState < 2 || video.currentTime === lastVT) return;
@@ -948,7 +1034,20 @@ function detect(now) {
   try {
     const r = handLM.detectForVideo(video, now), hd = r.handedness || r.handednesses || [];
     hands = (r.landmarks || []).map((lm, i) => analyzeHand(lm, r.worldLandmarks && r.worldLandmarks[i], hd[i] && hd[i][0] ? hd[i][0].categoryName : 'H' + i));
+    trackHands(now);
   } catch (e) { }
+  if (poseLM && frameN % 2 === 1) {
+    try {
+      const pw = 320, ph = Math.round(320 * vh / vw); if (poseIn.width !== pw || poseIn.height !== ph) { poseIn.width = pw; poseIn.height = ph; }
+      pix.drawImage(video, 0, 0, pw, ph);
+      const r = poseLM.detectForVideo(poseIn, now), lm = r.landmarks && r.landmarks[0];
+      if (lm && lm[11].visibility > 0.4 && lm[12].visibility > 0.4) {
+        const P = i => ({ ...toScreen(lm[i]), v: lm[i].visibility });
+        const ls = P(11), rs = P(12);
+        pose = { t: now, sw: dist(ls, rs), w: [P(15), P(16)], ix: [P(19), P(20)], el: [P(13), P(14)] };
+      }
+    } catch (e) { }
+  }
   if (faceLM && frameN % 2 === 0) {
     try {
       const r = faceLM.detectForVideo(video, now);
