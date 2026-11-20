@@ -602,7 +602,9 @@ function drawFrame(now) {
 const watch = { amt: 0, x: 0, y: 0, r: 0, ang: 0, seen: 0, lastTap: 0, near: false };
 const watchTaps = [];
 let watchHold = 0, armHold = 0;
+let lastMarkAt = 0;
 function markWatch(hands, now) {
+  const mdt = Math.min(0.2, (now - (lastMarkAt || now)) / 1000); lastMarkAt = now;     // real seconds, whatever the frame rate
   for (const h of hands) h.watchTap = false;
   // with the body pose: an index finger resting on the other wrist (works even when the hand model only sees one hand)
   if (poseFresh(now)) {
@@ -612,7 +614,7 @@ function markWatch(hands, now) {
       if (tip.v < 0.3 || wr.v < 0.3) continue;
       const d = dist(tip, wr) / P.sw;
       if (d < 0.3) {
-        watchHold += 1 / 30;
+        watchHold += mdt;
         if (watchHold < 0.25) return;
         const w = { x: wr.x + (wr.x - el.x) * -0.12, y: wr.y + (wr.y - el.y) * -0.12 };
         if (watch.amt < 0.05) { watch.x = w.x; watch.y = w.y; watch.ang = Math.atan2(wr.y - el.y, wr.x - el.x) - Math.PI / 2; }
@@ -627,13 +629,13 @@ function markWatch(hands, now) {
     watchHold = 0;
   }
   // "it's time" with one arm across your chest: a loosely curled hand held sideways low in the picture (the tapping hand is often hidden behind it)
-  const arm = hands.find(h => h.curled && !h.thumbsUp && Math.abs(h.p[9].y - h.p[0].y) < Math.abs(h.p[9].x - h.p[0].x) * 0.8 && h.p[0].y > H * 0.5);
+  const arm = now - lastClapAt > 1200 && hands.find(h => h.curled && !h.thumbsUp && (h.vel || 0) < 1.5 && Math.abs(h.p[9].y - h.p[0].y) < Math.abs(h.p[9].x - h.p[0].x) * 0.8 && h.p[0].y > H * 0.5);
   if (arm) {
-    armHold += 1 / 30;
-    if (armHold > 0.35) {
+    armHold += mdt;
+    if (armHold > 0.3) {
       const fx = arm.p[0].x - arm.p[9].x, fy = arm.p[0].y - arm.p[9].y, w = { x: arm.p[0].x + fx * 0.3, y: arm.p[0].y + fy * 0.3 };
       if (watch.amt < 0.05) { watch.x = w.x; watch.y = w.y; watch.ang = Math.atan2(fy, fx) - Math.PI / 2; }
-      watch.x = lerp(watch.x, w.x, 0.35); watch.y = lerp(watch.y, w.y, 0.35); watch.r = arm.size * 0.75; watch.seen = now;
+      watch.x = lerp(watch.x, w.x, 0.35); watch.y = lerp(watch.y, w.y, 0.35); watch.r = arm.size * 0.42; watch.seen = now;
       if (now - watch.lastTap > 650) { watch.lastTap = now; watchTaps.push({ x: w.x, y: w.y, r: watch.r, born: now }); }      // a soft tick every beat
       for (const h of hands) if (h !== arm && h.point) h.watchTap = true;
       return;
@@ -745,10 +747,10 @@ function updateExtras(hands, now, dt) {
 }
 function clap(at, s, now) {
   lastClapAt = now; clapPrev.far = 0;
-  const S = Math.max(s, Math.min(W, H) * 0.16);
+  const S = Math.min(Math.max(s, Math.min(W, H) * 0.08), Math.min(W, H) * 0.12);
   waves.push({ x: at.x, y: at.y, s: S, born: now }, { x: at.x, y: at.y, s: S * 0.7, born: now + 80 }, { x: at.x, y: at.y, s: S * 0.45, born: now + 160 });
   clapBurst = { x: at.x, y: at.y, s: S, born: now, rot: rand(0, 6) };
-  sparkle(at.x, at.y, 70, S * 0.7); confetti(at.x, at.y, 44, 1);
+  sparkle(at.x, at.y, 40, S * 0.6); confetti(at.x, at.y, 22, 0.7);
   say('👏');
 }
 function heartPath(s) {   // a heart centred on (0,0), size s
@@ -1025,8 +1027,6 @@ async function loadModels() {
   const hOpts = d => ({ baseOptions: { modelAssetPath: HAND_MODEL, delegate: d }, runningMode: 'VIDEO', numHands: 2, minHandDetectionConfidence: 0.5, minHandPresenceConfidence: 0.5, minTrackingConfidence: 0.5 });
   try { handLM = await HandLandmarker.createFromOptions(fileset, hOpts('GPU')); } catch (e) { handLM = await HandLandmarker.createFromOptions(fileset, hOpts('CPU')); }
   faceLM = await FaceLandmarker.createFromOptions(fileset, { baseOptions: { modelAssetPath: FACE_MODEL, delegate: 'CPU' }, runningMode: 'VIDEO', numFaces: 1, outputFaceBlendshapes: true });
-  // body pose: it still knows where both wrists are when your hands overlap (clapping, tapping your wrist), when the hand model loses one
-  try { poseLM = await PoseLandmarker.createFromOptions(fileset, { baseOptions: { modelAssetPath: POSE_MODEL, delegate: 'CPU' }, runningMode: 'VIDEO', numPoses: 1 }); } catch (e) { poseLM = null; }
 }
 function detect(now) {
   if (!handLM || video.readyState < 2 || video.currentTime === lastVT) return;
@@ -1048,7 +1048,7 @@ function detect(now) {
       }
     } catch (e) { }
   }
-  if (faceLM && frameN % 2 === 0) {
+  if (faceLM && frameN % 3 === 0) {
     try {
       const r = faceLM.detectForVideo(video, now);
       const bs = r.faceBlendshapes && r.faceBlendshapes[0] ? r.faceBlendshapes[0].categories : null;
